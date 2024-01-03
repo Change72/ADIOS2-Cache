@@ -20,6 +20,7 @@
 #include "adios2/toolkit/format/bp5/BP5Deserializer.h"
 #include "adios2/toolkit/remote/Remote.h"
 #include "adios2/toolkit/transportman/TransportMan.h"
+#include "adios2/toolkit/cache/KVCacheCommon.h"
 
 #include <chrono>
 #include <map>
@@ -96,6 +97,8 @@ private:
     Remote m_Remote;
     bool m_WriterIsActive = true;
     adios2::profiling::JSONProfiler m_JSONProfiler;
+
+    KVCacheCommon m_KVCacheCommon;
 
     /** used for per-step reads, TODO: to be moved to BP5Deserializer */
     size_t m_CurrentStep = 0;

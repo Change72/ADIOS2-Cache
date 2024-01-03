@@ -123,7 +123,7 @@ add_library(adios2_core
   toolkit/aggregator/mpi/MPIAggregator.cpp
   toolkit/aggregator/mpi/MPIChain.cpp
   toolkit/aggregator/mpi/MPIShmChain.cpp
-)
+        toolkit/cache/KVCacheCommon.cpp toolkit/cache/KVCacheCommon.h)
 set_property(TARGET adios2_core PROPERTY EXPORT_NAME core)
 set_property(TARGET adios2_core PROPERTY OUTPUT_NAME adios2${ADIOS2_LIBRARY_SUFFIX}_core)
 
@@ -203,7 +203,16 @@ if (ADIOS2_HAVE_SST)
   target_link_libraries(adios2_core PRIVATE adios2::thirdparty::EVPath)
   add_subdirectory(toolkit/remote)
 endif()
-   
+
+set(ADIOS2_USE_Cache True)
+if (ADIOS2_USE_Cache)
+#  add_subdirectory(toolkit/cache)
+  set(HIREDIS_DIR "/data/gc/ornl/hiredis-1.2.0/")
+  include_directories(${HIREDIS_DIR})
+  set(HIREDIS_LIBRARY ${HIREDIS_DIR}/build/libhiredis.so)
+  target_link_libraries(adios2_core PRIVATE hiredis)
+endif ()
+
 if(ADIOS2_HAVE_Campaign)
   target_sources(adios2_core PRIVATE 
           engine/campaign/CampaignReader.cpp 

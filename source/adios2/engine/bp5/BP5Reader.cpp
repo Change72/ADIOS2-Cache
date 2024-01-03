@@ -286,9 +286,35 @@ void BP5Reader::PerformRemoteGets()
 {
     // TP startGenerate = NOW();
     auto GetRequests = m_BP5Deserializer->PendingGetRequests;
+    if (getenv("useKVCache"))
+    {
+        m_KVCacheCommon.openConnection();
+    }
     for (auto &Req : GetRequests)
     {
+        if (getenv("useKVCache"))
+        {
+            std::string cacheKey;
+            m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
+                                           Req.Count, cacheKey);
+            if (m_KVCacheCommon.exists(cacheKey))
+            {
+                m_KVCacheCommon.get(cacheKey, Req.Data);
+                continue;
+            }
+        }
         m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
+        if (getenv("useKVCache"))
+        {
+            std::string cacheKey;
+            m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
+                                           Req.Count, cacheKey);
+            m_KVCacheCommon.set(cacheKey, Req.Data);
+        }
+    }
+    if (getenv("useKVCache"))
+    {
+        m_KVCacheCommon.closeConnection();
     }
 }
 
