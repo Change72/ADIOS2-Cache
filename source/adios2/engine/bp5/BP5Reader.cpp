@@ -292,6 +292,9 @@ void BP5Reader::PerformRemoteGets()
     }
     for (auto &Req : GetRequests)
     {
+        const DataType varType = m_IO.InquireVariableType(Req.VarName);
+        size_t numOfElements = m_KVCacheCommon.size(Req.Count);
+
         if (getenv("useKVCache"))
         {
             std::string cacheKey;
@@ -299,17 +302,50 @@ void BP5Reader::PerformRemoteGets()
                                            Req.Count, cacheKey);
             if (m_KVCacheCommon.exists(cacheKey))
             {
-                m_KVCacheCommon.get(cacheKey, Req.Data);
-                continue;
+
+#define declare_type_get(T)                                                                        \
+    if (varType == helper::GetDataType<T>())                                                       \
+    {                                                                                              \
+        std::vector<T> reqData;                                                                    \
+        reqData.resize(numOfElements);                                                             \
+        m_KVCacheCommon.get(cacheKey, reqData);                                                    \
+        std::memcpy(Req.Data, reqData.data(), numOfElements * sizeof(T));                          \
+    }
+    ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_get)
+#undef declare_type_get
+            continue;
             }
         }
         m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
+        // std::vector<int8_t> temp;
+
+        // temp.resize(size);
+        // std::memcpy(temp.data(), Req.Data, size * sizeof(int8_t));
+        // temp get data from Req.Data
+//        std::string cacheKey;
+//        m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
+//                                       Req.Count, cacheKey);
+//        std::vector<int8_t> reqData;
+//        reqData.resize(numOfElements);
+//        std::memcpy(reqData.data(), Req.Data, numOfElements * sizeof(int8_t));
+//        m_KVCacheCommon.set(cacheKey, reqData);
+
         if (getenv("useKVCache"))
         {
             std::string cacheKey;
             m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
                                            Req.Count, cacheKey);
-            m_KVCacheCommon.set(cacheKey, Req.Data);
+
+#define declare_type_set(T)                                                                        \
+    if (varType == helper::GetDataType<T>())                                                       \
+    {                                                                                              \
+        std::vector<T> reqData;                                                                    \
+        reqData.resize(numOfElements);                                                             \
+        std::memcpy(reqData.data(), Req.Data, numOfElements * sizeof(T));                          \
+        m_KVCacheCommon.set(cacheKey, reqData);                                                    \
+    }
+    ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_set)
+#undef declare_type_set
         }
     }
     if (getenv("useKVCache"))

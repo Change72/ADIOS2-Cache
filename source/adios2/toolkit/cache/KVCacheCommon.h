@@ -27,22 +27,58 @@ public:
 
     KVCacheCommon(std::string host="localhost", int port=6379): m_host(host), m_port(port){};
 
-    void openConnection();
+    inline void openConnection();
 
-    void closeConnection();
+    inline void closeConnection();
 
-    void set(std::string key, void* Data);
+    template <typename T>
+    void set(std::string key, const std::vector<T>& vec);
 
-    void get(std::string key, void* Data);
+    template <typename T>
+    void get(std::string key, std::vector<T>& vec);
 
-    void del(std::string key);
+    inline void del(std::string key);
 
-    bool exists(std::string key);
+    inline bool exists(std::string key);
 
-    void keyComposition(char *VarName, size_t AbsStep, size_t BlockID, Dims Start, Dims Count, std::string &cacheKey);
+    inline void keyComposition(char *VarName, size_t AbsStep, size_t BlockID, Dims Start, Dims Count, std::string &cacheKey);
+
+//    template <typename T>
+//    void serializeVector(const std::vector<T>& vec, std::string& serializedString) {
+//        nlohmann::json j = vec;
+//        serializedString = j.dump();
+//    }
+//
+//    template <typename T>
+//    void deserializeVector(const std::string& str, std::vector<T>& vec) {
+//        nlohmann::json j = nlohmann::json::parse(str);
+//        vec = j.get<std::vector<T>>();
+//    }
+
+    size_t size(Dims Count) const
+    {
+        size_t size = 1;
+        for(auto i: Count)
+        {
+            size *= i;
+        }
+        return size;
+    }
+
+    inline std::string base64Encode(const std::vector<char>& data);
+
+    inline std::vector<char> base64Decode(const std::string& encoded);
+
+    template <typename T>
+    void encodeVector(const std::vector<T>& vec, std::string& encodedString);
+
+    template <typename T>
+    void decodeVector(const std::string& str, std::vector<T>& vec);
 };
 
 
 }; // adios2
+
+#include "KVCacheCommon.inl"
 
 #endif // ADIOS2_KVCACHECOMMON_H

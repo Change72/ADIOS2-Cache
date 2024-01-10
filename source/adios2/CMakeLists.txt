@@ -123,7 +123,12 @@ add_library(adios2_core
   toolkit/aggregator/mpi/MPIAggregator.cpp
   toolkit/aggregator/mpi/MPIChain.cpp
   toolkit/aggregator/mpi/MPIShmChain.cpp
-        toolkit/cache/KVCacheCommon.cpp toolkit/cache/KVCacheCommon.h)
+
+  toolkit/cache/KVCacheCommon.h
+  toolkit/cache/KVCacheCommon.inl
+#  toolkit/cache/KVCacheBase64.h
+#  toolkit/cache/KVCacheBase64.cpp
+        )
 set_property(TARGET adios2_core PROPERTY EXPORT_NAME core)
 set_property(TARGET adios2_core PROPERTY OUTPUT_NAME adios2${ADIOS2_LIBRARY_SUFFIX}_core)
 
@@ -207,10 +212,18 @@ endif()
 set(ADIOS2_USE_Cache True)
 if (ADIOS2_USE_Cache)
 #  add_subdirectory(toolkit/cache)
+# Note: need to export LD_LIBRARY_PATH=/data/gc/ornl/hiredis-1.2.0/build:/data/gc/ornl/openssl:$LD_LIBRARY_PATH
   set(HIREDIS_DIR "/data/gc/ornl/hiredis-1.2.0/")
   include_directories(${HIREDIS_DIR})
   set(HIREDIS_LIBRARY ${HIREDIS_DIR}/build/libhiredis.so)
   target_link_libraries(adios2_core PRIVATE hiredis)
+
+  set(OPENSSL_DIR "/data/gc/ornl/openssl/")
+  set(OPENSSL_INCLUDE_DIR ${OPENSSL_DIR}/include)
+  set(OPENSSL_LIBRARY_SSL ${OPENSSL_DIR}/libssl.so)
+  set(OPENSSL_LIBRARY_CRYPTO ${OPENSSL_DIR}/libcrypto.so)
+  target_include_directories(adios2_core PRIVATE ${OPENSSL_INCLUDE_DIR})
+  target_link_libraries(adios2_core PRIVATE ${OPENSSL_LIBRARY_SSL} ${OPENSSL_LIBRARY_CRYPTO})
 endif ()
 
 if(ADIOS2_HAVE_Campaign)
@@ -436,7 +449,7 @@ else()
 endif()
 
 # The main "adios2" target provides all interfaces.
-add_library(adios2 INTERFACE)
+add_library(adios2 INTERFACE toolkit/cache/KVCacheBase64.h)
 target_link_libraries(adios2 INTERFACE
   ${maybe_adios2_c_mpi} adios2_c
   ${maybe_adios2_cxx11_mpi} adios2_cxx11
