@@ -3,11 +3,13 @@
 //
 
 #ifndef ADIOS2_KVCACHE_QUERYBOX_H
-#include "adios2/common/ADIOSTypes.h"
 #define ADIOS2_KVCACHE_QUERYBOX_H
 
 #include <set>
 #include "json.hpp"
+
+#include "adios2/common/ADIOSTypes.h"
+
 namespace adios2
 {
 // QueryBox is a class to represent a query box in a multi-dimensional space
@@ -16,9 +18,6 @@ class QueryBox
 public:
     adios2::Dims start{};
     adios2::Dims count{};
-
-    // data
-    double *data{};
 
     // constructor
     QueryBox() = default;
@@ -77,7 +76,73 @@ public:
         }
         return true;
     }
+
+    // determine if a query box is fully contained in another query box
+    bool isFullContainedBy(const QueryBox &box)
+    {
+        if (start.size() != box.start.size() || start.size() != count.size() ||
+            start.size() != box.count.size())
+        {
+            return false;
+        }
+        for (size_t i = 0; i < start.size(); ++i)
+        {
+            if (start[i] < box.start[i] || start[i] + count[i] > box.start[i] + box.count[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     /*
+    template <typename T>
+    void copyContainedData(const QueryBox& cacheBox, std::vector<T>& srcData, std::vector<T>& dstData) {
+        size_t dim = this->start.size();
+
+        // find the continuous dimensions
+        size_t nContDim = 1;
+        while (nContDim <= dim - 1 &&
+            this->count[dim - nContDim] == cacheBox.count[dim - nContDim] &&
+            this->start[dim - nContDim] == cacheBox.start[dim - nContDim])
+        {
+            ++nContDim;
+        }
+        // Note: 1 <= nContDim <= dimensions
+        size_t blockSize = 1;
+        size_t inOvlpSize = 1;
+        for (size_t i = 1; i <= nContDim; ++i)
+        {
+            blockSize *= (this->count[dim - i]);
+            inOvlpSize *= (cacheBox.count[dim - i]);
+        }
+
+        // find the base of the intersection part
+        std::vector<size_t> inOvlpCount(dim, 0);
+        inOvlpCount[dim - 1] = 1;
+        for (size_t i = dim - 2; i >= 0; i--)
+        {
+            inOvlpCount[i] = this->count[i + 1] * inOvlpCount[i + 1];
+        }
+
+        size_t inOvlpBase = 0;
+        for (size_t i = 0; i < dim; i++)
+        {
+            inOvlpBase += inOvlpCount[i] * (intersection.start[i] - cacheBox.start[i]);
+        }
+        
+        // const cacheBox size
+        const size_t cacheBoxSize = cacheBox.size();
+        for (size_t i = 0; i * blockSize >= this->size(); i++){
+            // copy data from intersection part to data
+            std::memcpy(dstData.data() + i * blockSize, srcData.data() + inOvlpBase, blockSize * sizeof(T));
+            inOvlpBase += inOvlpSize;
+        }
+
+        // copy data from srcData to dstData
+        
+    }
+
     // if a query box is interacted with one of previous query boxes, return the remaining part as a set of query boxes intersection is inside outer
     std::set<QueryBox> getRemaining2D(const QueryBox &outer, const QueryBox &intersection)
     {

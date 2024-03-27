@@ -313,22 +313,49 @@ void BP5Reader::PerformRemoteGets()
     }
     ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_get)
 #undef declare_type_get
-            continue;
+                continue;
+            } else {
+                bool fullContained = false;
+                std::cout << "cacheKey: " << cacheKey << std::endl;
+                QueryBox targetBox(Req.Start, Req.Count);
+
+                std::set<std::string> samePrefixKeys;
+                m_KVCacheCommon.keyPrefixExistence(Req.VarName, Req.RelStep, Req.BlockID, samePrefixKeys);
+                for (auto &key : samePrefixKeys)
+                {
+                    std::cout << "key: " << key << std::endl;
+                    QueryBox box;
+                    m_KVCacheCommon.extractStartCount(key, box.start, box.count);
+                    if (targetBox.isFullContainedBy(box))
+                    {
+                        const size_t boxNumOfElements = box.size();
+                        std::cout << "boxNumOfElements: " << boxNumOfElements << std::endl;
+                        std::cout << "numOfElements: " << numOfElements << std::endl;
+#define declare_type_full_contain(T)                                                               \
+    if (varType == helper::GetDataType<T>())                                                       \
+    {                                                                                              \
+        const int typeSize = sizeof(T);                                                            \
+        std::vector<T> srcData;                                                                    \
+        srcData.resize(boxNumOfElements);                                                          \
+        m_KVCacheCommon.get(key, srcData);                                                         \
+        std::vector<T> reqData;                                                                    \
+        reqData.resize(numOfElements);                                                             \
+        helper::NdCopy(reinterpret_cast<char*>(srcData.data()), helper::CoreDims(box.start), box.count, true, false, reinterpret_cast<char*>(reqData.data()), Req.Start, Req.Count, true, false, typeSize); \
+        std::memcpy(Req.Data, reqData.data(), numOfElements * sizeof(T));\
+    }
+    ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
+#undef declare_type_full_contain
+                        fullContained = true;
+                        break;
+                    }
+                }
+                if (fullContained)
+                {
+                    continue;
+                }
             }
         }
         m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
-        // std::vector<int8_t> temp;
-
-        // temp.resize(size);
-        // std::memcpy(temp.data(), Req.Data, size * sizeof(int8_t));
-        // temp get data from Req.Data
-//        std::string cacheKey;
-//        m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
-//                                       Req.Count, cacheKey);
-//        std::vector<int8_t> reqData;
-//        reqData.resize(numOfElements);
-//        std::memcpy(reqData.data(), Req.Data, numOfElements * sizeof(int8_t));
-//        m_KVCacheCommon.set(cacheKey, reqData);
 
         if (getenv("useKVCache"))
         {

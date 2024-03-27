@@ -3,9 +3,9 @@
 //
 
 #ifndef ADIOS2_KVCACHECOMMON_H
+#define ADIOS2_KVCACHECOMMON_H
 #include <hiredis/hiredis.h>
 #include "adios2/toolkit/cache/QueryBox.h"
-#define ADIOS2_KVCACHECOMMON_H
 #include <iostream>
 
 
@@ -42,6 +42,10 @@ public:
     inline bool exists(std::string key);
 
     inline void keyComposition(char *VarName, size_t AbsStep, size_t BlockID, Dims Start, Dims Count, std::string &cacheKey);
+
+    inline void keyPrefixExistence(char *VarName, size_t AbsStep, size_t BlockID, std::set<std::string> &keys);
+
+    inline void extractStartCount(const std::string &key, Dims &Start, Dims &Count);
 
 //    template <typename T>
 //    void serializeVector(const std::vector<T>& vec, std::string& serializedString) {

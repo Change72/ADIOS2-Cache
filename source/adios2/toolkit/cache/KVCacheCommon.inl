@@ -33,6 +33,7 @@ void KVCacheCommon::closeConnection()
 {
     redisFree(m_redisContext);
 }
+
 template <typename T>
 void KVCacheCommon::set(std::string key, const std::vector<T>& vec)
 {
@@ -52,6 +53,7 @@ void KVCacheCommon::set(std::string key, const std::vector<T>& vec)
         freeReplyObject(m_redisReply);
     }
 }
+
 template <typename T>
 void KVCacheCommon::get(std::string key, std::vector<T>& vec)
 {
@@ -64,7 +66,7 @@ void KVCacheCommon::get(std::string key, std::vector<T>& vec)
     }
     else
     {
-        std::cout << "GET: " << m_redisReply->str << std::endl;
+        // std::cout << "GET: " << m_redisReply->str << std::endl;
         decodeVector(m_redisReply->str, vec);
         freeReplyObject(m_redisReply);
     }
@@ -125,6 +127,47 @@ void KVCacheCommon::keyComposition(char *VarName, size_t AbsStep, size_t BlockID
     std::replace(cacheKey.begin(), cacheKey.end(), ']', '_');
     std::replace(cacheKey.begin(), cacheKey.end(), '{', '_');
     std::replace(cacheKey.begin(), cacheKey.end(), '}', '_');
+}
+
+void KVCacheCommon::keyPrefixExistence(char *VarName, size_t AbsStep, size_t BlockID, std::set<std::string> &keys)
+{
+    std::string key = VarName + std::to_string(AbsStep) + std::to_string(BlockID);
+    std::string keyPattern = key + "*";
+    m_command = "KEYS " + keyPattern;
+    m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
+    if (m_redisReply == NULL)
+    {
+        std::cout << "Error: " << m_redisContext->errstr << std::endl;
+    }
+    else
+    {
+        for (int i = 0; i < m_redisReply->elements; i++)
+        {
+            keys.insert(m_redisReply->element[i]->str);
+        }
+        freeReplyObject(m_redisReply);
+    }
+}
+
+void KVCacheCommon::extractStartCount(const std::string &key, Dims &Start, Dims &Count)
+{
+    // sample key: "U3218446744073709551615__count_:_64_64_64___start_:_0_0_0__", count [64, 64, 64], start [0, 0, 0]
+    // using Dims = std::vector<size_t>;
+    auto lf_ExtractDimensions = [](const std::string &key, const std::string &delimiter) -> Dims {
+        size_t pos = key.find(delimiter);
+        size_t end = key.find("__", pos + delimiter.length());
+        std::string dimStr = key.substr(pos + delimiter.length(), end - pos - delimiter.length());
+        Dims dimensions;
+        std::istringstream dimStream(dimStr);
+        std::string token;
+        while (std::getline(dimStream, token, '_')) {
+            dimensions.push_back(std::stoul(token));
+        }
+        return dimensions;
+    };
+
+    Start = lf_ExtractDimensions(key, "__start_:_");
+    Count = lf_ExtractDimensions(key, "__count_:_");
 }
 
 std::string KVCacheCommon::base64Encode(const std::vector<char> &data)
