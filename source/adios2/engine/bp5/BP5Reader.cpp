@@ -293,13 +293,13 @@ void BP5Reader::PerformRemoteGets()
     for (auto &Req : GetRequests)
     {
         const DataType varType = m_IO.InquireVariableType(Req.VarName);
-        size_t numOfElements = m_KVCacheCommon.size(Req.Count);
+        QueryBox targetBox(Req.Start, Req.Count);
+        size_t numOfElements = targetBox.size();
+        std::string keyPrefix = m_KVCacheCommon.keyPrefix(Req.VarName, Req.RelStep, Req.BlockID);
+        std::string cacheKey = m_KVCacheCommon.keyComposition(keyPrefix, Req.Start, Req.Count);
 
         if (getenv("useKVCache"))
         {
-            std::string cacheKey;
-            m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
-                                           Req.Count, cacheKey);
             if (m_KVCacheCommon.exists(cacheKey))
             {
 
@@ -315,17 +315,47 @@ void BP5Reader::PerformRemoteGets()
 #undef declare_type_get
                 continue;
             } else {
-                bool fullContained = false;
-                std::cout << "cacheKey: " << cacheKey << std::endl;
-                QueryBox targetBox(Req.Start, Req.Count);
-
+                int max_depth = 1;
                 std::set<std::string> samePrefixKeys;
-                m_KVCacheCommon.keyPrefixExistence(Req.VarName, Req.RelStep, Req.BlockID, samePrefixKeys);
+                m_KVCacheCommon.keyPrefixExistence(keyPrefix, samePrefixKeys);
+                std::vector<QueryBox> regularBoxes;
+                std::vector<QueryBox> cachedBoxes;
+                std::vector<std::string> cachedKeys;
+                m_KVCacheCommon.getMaxInteractBox(samePrefixKeys, targetBox, max_depth, 0, regularBoxes, cachedBoxes, cachedKeys);
+
+#define declare_type_full_contain(T)                                                               \
+    if (varType == helper::GetDataType<T>())                                                       \
+    {                                                                                              \
+        const int typeSize = sizeof(T);                                                            \
+        std::vector<T> reqData;                                                                    \
+        reqData.resize(numOfElements);                                                             \
+        for (auto &box : regularBoxes){                                                            \
+            std::string boxKey = m_KVCacheCommon.keyComposition(keyPrefix, box.start, box.count);  \
+            std::vector<T> srcData;                                                                \
+            srcData.resize(box.size());                                                            \
+            m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, box.count, box.start, srcData.data());    \
+            helper::NdCopy(reinterpret_cast<char*>(srcData.data()), helper::CoreDims(box.start), box.count, true, false, reinterpret_cast<char*>(reqData.data()), Req.Start, Req.Count, true, false, typeSize); \
+            m_KVCacheCommon.set(boxKey, srcData);                                                  \
+        }                                                                                          \
+        for (int i = 0; i < cachedBoxes.size(); i++){                                              \
+            std::string boxKey = cachedKeys[i];                                                    \
+            QueryBox box(boxKey);                                                                  \
+            std::vector<T> srcData;                                                                \
+            srcData.resize(box.size());                                                            \
+            m_KVCacheCommon.get(boxKey, srcData);                                                  \
+            helper::NdCopy(reinterpret_cast<char*>(srcData.data()), helper::CoreDims(cachedBoxes[i].start), cachedBoxes[i].count, true, false, reinterpret_cast<char*>(reqData.data()), Req.Start, Req.Count, true, false, typeSize); \
+        }                                                                                          \
+        std::memcpy(Req.Data, reqData.data(), numOfElements * sizeof(T));                          \
+    }
+ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
+#undef declare_type_full_contain
+
+/*
+                bool fullContained = false;
                 for (auto &key : samePrefixKeys)
                 {
                     std::cout << "key: " << key << std::endl;
-                    QueryBox box;
-                    m_KVCacheCommon.extractStartCount(key, box.start, box.count);
+                    QueryBox box(key);
                     if (targetBox.isFullContainedBy(box))
                     {
                         const size_t boxNumOfElements = box.size();
@@ -353,15 +383,14 @@ void BP5Reader::PerformRemoteGets()
                 {
                     continue;
                 }
+*/
+
             }
         }
         m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
 
         if (getenv("useKVCache"))
         {
-            std::string cacheKey;
-            m_KVCacheCommon.keyComposition(Req.VarName, Req.RelStep, Req.BlockID, Req.Start,
-                                           Req.Count, cacheKey);
 
 #define declare_type_set(T)                                                                        \
     if (varType == helper::GetDataType<T>())                                                       \

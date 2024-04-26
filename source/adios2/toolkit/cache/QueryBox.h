@@ -22,6 +22,25 @@ public:
     // constructor
     QueryBox() = default;
     QueryBox(const adios2::Dims &start, const adios2::Dims &count) : start(start), count(count){};
+    QueryBox(const std::string &key){
+        // sample key: "U3218446744073709551615__count_:_64_64_64___start_:_0_0_0__", count [64, 64, 64], start [0, 0, 0]
+        // using Dims = std::vector<size_t>;
+        auto lf_ExtractDimensions = [](const std::string &key, const std::string &delimiter) -> Dims {
+            size_t pos = key.find(delimiter);
+            size_t end = key.find("__", pos + delimiter.length());
+            std::string dimStr = key.substr(pos + delimiter.length(), end - pos - delimiter.length());
+            Dims dimensions;
+            std::istringstream dimStream(dimStr);
+            std::string token;
+            while (std::getline(dimStream, token, '_')) {
+                dimensions.push_back(std::stoul(token));
+            }
+            return dimensions;
+        };
+
+        this->start = lf_ExtractDimensions(key, "__start_:_");
+        this->count = lf_ExtractDimensions(key, "__count_:_");
+    }
 
     // size
     size_t size() const
@@ -53,8 +72,14 @@ public:
         return box;
     }
 
+    // determine if a query box is equal to another query box
+    bool operator==(const QueryBox &box) const
+    {
+        return start == box.start && count == box.count;
+    }
+
     // determine if a query box is interacted in another query box, return intersection part as a new query box
-    bool isInteracted(const QueryBox &box, QueryBox &intersection)
+    bool isInteracted (const QueryBox &box, QueryBox &intersection) const
     {
         if (start.size() != box.start.size() || start.size() != count.size() ||
             start.size() != box.count.size())
@@ -94,134 +119,77 @@ public:
         }
         return true;
     }
-    
-    /*
-    template <typename T>
-    void copyContainedData(const QueryBox& cacheBox, std::vector<T>& srcData, std::vector<T>& dstData) {
-        size_t dim = this->start.size();
 
-        // find the continuous dimensions
-        size_t nContDim = 1;
-        while (nContDim <= dim - 1 &&
-            this->count[dim - nContDim] == cacheBox.count[dim - nContDim] &&
-            this->start[dim - nContDim] == cacheBox.start[dim - nContDim])
-        {
-            ++nContDim;
-        }
-        // Note: 1 <= nContDim <= dimensions
-        size_t blockSize = 1;
-        size_t inOvlpSize = 1;
-        for (size_t i = 1; i <= nContDim; ++i)
-        {
-            blockSize *= (this->count[dim - i]);
-            inOvlpSize *= (cacheBox.count[dim - i]);
-        }
-
-        // find the base of the intersection part
-        std::vector<size_t> inOvlpCount(dim, 0);
-        inOvlpCount[dim - 1] = 1;
-        for (size_t i = dim - 2; i >= 0; i--)
-        {
-            inOvlpCount[i] = this->count[i + 1] * inOvlpCount[i + 1];
-        }
-
-        size_t inOvlpBase = 0;
-        for (size_t i = 0; i < dim; i++)
-        {
-            inOvlpBase += inOvlpCount[i] * (intersection.start[i] - cacheBox.start[i]);
-        }
-        
-        // const cacheBox size
-        const size_t cacheBoxSize = cacheBox.size();
-        for (size_t i = 0; i * blockSize >= this->size(); i++){
-            // copy data from intersection part to data
-            std::memcpy(dstData.data() + i * blockSize, srcData.data() + inOvlpBase, blockSize * sizeof(T));
-            inOvlpBase += inOvlpSize;
-        }
-
-        // copy data from srcData to dstData
-        
-    }
-
-    // if a query box is interacted with one of previous query boxes, return the remaining part as a set of query boxes intersection is inside outer
-    std::set<QueryBox> getRemaining2D(const QueryBox &outer, const QueryBox &intersection)
+    // cut a query box from another interaction box, return a list of regular box
+    // remainingBox is the big one, this is small one
+    void interactionCut(const QueryBox &remainingBox, std::vector<QueryBox> &regularBoxes)
     {
-        std::set<QueryBox> remaining;
-        bool isRowMajor = true;
-        // copy outer box
-        QueryBox outerCopy;
-        for (size_t i = 0; i < outer.start.size(); i++)
+        if (remainingBox == *this)
         {
-            outerCopy.start.push_back(outer.start[i]);
-            outerCopy.count.push_back(outer.count[i]);
+            return;
         }
 
-        if (isRowMajor)
+        // find the max cut dimension
+        size_t maxCutDimSize = 0;
+        QueryBox maxCutDimBox;
+        for (size_t i = 0; i < start.size(); ++i)
         {
-            bool cutting = true;
-            while (cutting)
+            if (start[i] == remainingBox.start[i] && count[i] == remainingBox.count[i])
             {
-                // if fully matched, no remaining
-                if (outerCopy.start == intersection.start && outerCopy.count == intersection.count)
-                {
-                    cutting = false;
-                    break;
+                continue;
+            }
+            else {
+                if (start[i] != remainingBox.start[i]){
+                    size_t cutDimDiff = start[i] - remainingBox.start[i];
+                    size_t cutDimSize = remainingBox.size() / remainingBox.count[i] * cutDimDiff;
+                    if (cutDimSize > maxCutDimSize)
+                    {
+                        maxCutDimSize = cutDimSize;
+                        maxCutDimBox = QueryBox(remainingBox.start, remainingBox.count);
+                        maxCutDimBox.count[i] = cutDimDiff;
+                    }
                 }
 
-                QueryBox box;
-                box.start = outerCopy.start;
-                box.count = outerCopy.count;
-                // if not fully matched, check each dimension
-                // first, cut from tail of the first dimension
-                if (outerCopy.start[0] == intersection.start[0] and
-                    outerCopy.count[0] != intersection.count[0])
-                {
-                    box.start[0] = intersection.start[0] + intersection.count[0];
-                    box.count[0] = outerCopy.count[0] - intersection.count[0];
-                    remaining.insert(box);
-
-                    outerCopy.count[0] = intersection.count[0];
-                    continue;
-                }
-
-                // second, cut from head of the first dimension
-                if (outerCopy.start[0] != intersection.start[0])
-                {
-                    box.count[0] = intersection.start[0] - outerCopy.start[0];
-                    remaining.insert(box);
-                    outerCopy.count[0] =
-                        outerCopy.start[0] + outerCopy.count[0] - intersection.start[0];
-                    outerCopy.start[0] = intersection.start[0];
-                    continue;
-                }
-
-                // third, cut from tail of the second dimension
-                if (outerCopy.start[1] == intersection.start[1] and
-                    outerCopy.count[1] != intersection.count[1])
-                {
-                    box.start[1] = intersection.start[1] + intersection.count[1];
-                    box.count[1] = outerCopy.count[1] - intersection.count[1];
-                    remaining.insert(box);
-
-                    outerCopy.count[1] = intersection.count[1];
-                    continue;
-                }
-
-                // fourth, cut from head of the second dimension
-                if (outerCopy.start[1] != intersection.start[1])
-                {
-                    box.count[1] = intersection.start[1] - outerCopy.start[1];
-                    remaining.insert(box);
-                    outerCopy.count[1] =
-                        outerCopy.start[1] + outerCopy.count[1] - intersection.start[1];
-                    outerCopy.start[1] = intersection.start[1];
-                    continue;
+                if (start[i] + count[i] != remainingBox.start[i] + remainingBox.count[i]){
+                    size_t cutDimDiff = remainingBox.start[i] + remainingBox.count[i] - start[i] - count[i];
+                    size_t cutDimSize = remainingBox.size() / count[i] * cutDimDiff;
+                    if (cutDimSize > maxCutDimSize)
+                    {
+                        maxCutDimSize = cutDimSize;
+                        maxCutDimBox = QueryBox(remainingBox.start, remainingBox.count);
+                        maxCutDimBox.start[i] = start[i] + count[i];
+                        maxCutDimBox.count[i] = cutDimDiff;
+                    }
                 }
             }
         }
-        return remaining;
+
+        // cut the max cut dimension
+        if (maxCutDimSize > 0)
+        {
+            regularBoxes.push_back(maxCutDimBox);
+            QueryBox remainingBox1 = QueryBox(remainingBox.start, remainingBox.count);
+            for (size_t i = 0; i < remainingBox.start.size(); ++i)
+            {
+                if (maxCutDimBox.start[i] == remainingBox.start[i] && maxCutDimBox.count[i] == remainingBox.count[i])
+                {
+                    continue;
+                }
+                else {
+                    if (maxCutDimBox.start[i] != remainingBox.start[i])
+                    {
+                        remainingBox1.count[i] = maxCutDimBox.start[i] - remainingBox.start[i];
+                    } else {
+                        remainingBox1.start[i] = maxCutDimBox.start[i] + maxCutDimBox.count[i];
+                        remainingBox1.count[i] = remainingBox.start[i] + remainingBox.count[i] - remainingBox1.start[i];
+                    }
+
+                }
+            }
+            interactionCut(remainingBox1, regularBoxes);
+        }
     }
-     */
+    
 };
 };
 #endif // UNITTEST_QUERYBOX_H

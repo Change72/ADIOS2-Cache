@@ -113,11 +113,15 @@ bool KVCacheCommon::exists(std::string key)
     }
 }
 
-void KVCacheCommon::keyComposition(char *VarName, size_t AbsStep, size_t BlockID, Dims Start, Dims Count, std::string &cacheKey)
+std::string KVCacheCommon::keyPrefix(char *VarName, size_t AbsStep, size_t BlockID)
 {
-    std::string key = VarName + std::to_string(AbsStep) + std::to_string(BlockID);
+    return VarName + std::to_string(AbsStep) + std::to_string(BlockID);
+}
+
+std::string KVCacheCommon::keyComposition(const std::string &key_prefix, Dims Start, Dims Count)
+{
     std::string box = QueryBox::serializeQueryBox(QueryBox{Start, Count});
-    cacheKey = key + box;
+    std::string cacheKey = key_prefix + box;
     // replace special characters
     std::replace(cacheKey.begin(), cacheKey.end(), '"', '_');
     std::replace(cacheKey.begin(), cacheKey.end(), ',', '_');
@@ -127,12 +131,12 @@ void KVCacheCommon::keyComposition(char *VarName, size_t AbsStep, size_t BlockID
     std::replace(cacheKey.begin(), cacheKey.end(), ']', '_');
     std::replace(cacheKey.begin(), cacheKey.end(), '{', '_');
     std::replace(cacheKey.begin(), cacheKey.end(), '}', '_');
+    return cacheKey;
 }
 
-void KVCacheCommon::keyPrefixExistence(char *VarName, size_t AbsStep, size_t BlockID, std::set<std::string> &keys)
+void KVCacheCommon::keyPrefixExistence(const std::string &key_prefix, std::set<std::string> &keys)
 {
-    std::string key = VarName + std::to_string(AbsStep) + std::to_string(BlockID);
-    std::string keyPattern = key + "*";
+    std::string keyPattern = key_prefix + "*";
     m_command = "KEYS " + keyPattern;
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
@@ -149,25 +153,43 @@ void KVCacheCommon::keyPrefixExistence(char *VarName, size_t AbsStep, size_t Blo
     }
 }
 
-void KVCacheCommon::extractStartCount(const std::string &key, Dims &Start, Dims &Count)
+void KVCacheCommon::getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const QueryBox &queryBox, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBox, std::vector<std::string> &cachedKeys)
 {
-    // sample key: "U3218446744073709551615__count_:_64_64_64___start_:_0_0_0__", count [64, 64, 64], start [0, 0, 0]
-    // using Dims = std::vector<size_t>;
-    auto lf_ExtractDimensions = [](const std::string &key, const std::string &delimiter) -> Dims {
-        size_t pos = key.find(delimiter);
-        size_t end = key.find("__", pos + delimiter.length());
-        std::string dimStr = key.substr(pos + delimiter.length(), end - pos - delimiter.length());
-        Dims dimensions;
-        std::istringstream dimStream(dimStr);
-        std::string token;
-        while (std::getline(dimStream, token, '_')) {
-            dimensions.push_back(std::stoul(token));
+    if (current_depth > max_depth)
+    {
+        return;
+    }
+    current_depth++;
+    QueryBox maxInteractBox;
+    std::string maxInteractKey;
+    for (auto &key : samePrefixKeys)
+    {
+        QueryBox cachedBox(key);
+        QueryBox intersection;
+        if (queryBox.isInteracted(cachedBox, intersection))
+        {
+            if (maxInteractBox.size() < intersection.size())
+            {
+                maxInteractBox = intersection;
+                maxInteractKey = key;
+            }
         }
-        return dimensions;
-    };
+    }
 
-    Start = lf_ExtractDimensions(key, "__start_:_");
-    Count = lf_ExtractDimensions(key, "__count_:_");
+    cachedBox.push_back(maxInteractBox);
+    cachedKeys.push_back(maxInteractKey);
+
+    if (current_depth == max_depth)
+    {
+        maxInteractBox.interactionCut(queryBox, regularBoxes);
+    } else {
+        std::vector<QueryBox> nextBoxes;
+        maxInteractBox.interactionCut(queryBox, nextBoxes);
+        for (auto &box : nextBoxes)
+        {
+            getMaxInteractBox(samePrefixKeys, box, max_depth, current_depth, regularBoxes, cachedBox, cachedKeys);
+        }
+    }   
 }
 
 std::string KVCacheCommon::base64Encode(const std::vector<char> &data)

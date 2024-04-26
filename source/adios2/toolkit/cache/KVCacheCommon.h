@@ -41,33 +41,13 @@ public:
 
     inline bool exists(std::string key);
 
-    inline void keyComposition(char *VarName, size_t AbsStep, size_t BlockID, Dims Start, Dims Count, std::string &cacheKey);
+    inline std::string keyPrefix(char *VarName, size_t AbsStep, size_t BlockID);
 
-    inline void keyPrefixExistence(char *VarName, size_t AbsStep, size_t BlockID, std::set<std::string> &keys);
+    inline std::string keyComposition(const std::string &key_prefix, Dims Start, Dims Count);
 
-    inline void extractStartCount(const std::string &key, Dims &Start, Dims &Count);
+    inline void keyPrefixExistence(const std::string &key_prefix, std::set<std::string> &keys);
 
-//    template <typename T>
-//    void serializeVector(const std::vector<T>& vec, std::string& serializedString) {
-//        nlohmann::json j = vec;
-//        serializedString = j.dump();
-//    }
-//
-//    template <typename T>
-//    void deserializeVector(const std::string& str, std::vector<T>& vec) {
-//        nlohmann::json j = nlohmann::json::parse(str);
-//        vec = j.get<std::vector<T>>();
-//    }
-
-    size_t size(Dims Count) const
-    {
-        size_t size = 1;
-        for(auto i: Count)
-        {
-            size *= i;
-        }
-        return size;
-    }
+    inline void getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const QueryBox &queryBox, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes, std::vector<std::string> &cachedKeys);
 
     inline std::string base64Encode(const std::vector<char>& data);
 

@@ -40,3 +40,8 @@ docs/pyvenv.cfg
 # Visual Studio
 .vs/
 CMakeSettings.json
+
+# gc
+.idea/
+build-python/
+cmake-build-debug/
