@@ -107,7 +107,7 @@ bool KVCacheCommon::exists(std::string key)
             std::cout << "Key does not exist" << std::endl;
             return false;
         }
-        std::cout << "EXISTS: " << m_redisReply->str << std::endl;
+        // std::cout << "EXISTS: " << m_redisReply->str << std::endl;
         freeReplyObject(m_redisReply);
         return true;
     }
@@ -153,44 +153,45 @@ void KVCacheCommon::keyPrefixExistence(const std::string &key_prefix, std::set<s
     }
 }
 
-void KVCacheCommon::getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const QueryBox &queryBox, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBox, std::vector<std::string> &cachedKeys)
-{
-    if (current_depth > max_depth)
-    {
-        return;
-    }
-    current_depth++;
-    QueryBox maxInteractBox;
-    std::string maxInteractKey;
-    for (auto &key : samePrefixKeys)
-    {
-        QueryBox cachedBox(key);
-        QueryBox intersection;
-        if (queryBox.isInteracted(cachedBox, intersection))
-        {
-            if (maxInteractBox.size() < intersection.size())
-            {
-                maxInteractBox = intersection;
-                maxInteractKey = key;
-            }
-        }
-    }
+// void KVCacheCommon::getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const QueryBox &queryBox, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBox, std::vector<std::string> &cachedKeys)
+// {
+//     if (current_depth > max_depth)
+//     {
+//         return;
+//     }
+//     current_depth++;
+//     QueryBox maxInteractBox;
+//     std::string maxInteractKey;
+//     for (auto &key : samePrefixKeys)
+//     {
+//         std::cout << "key111: " << key << std::endl;
+//         QueryBox const box(key);
+//         QueryBox intersection;
+//         if (queryBox.isInteracted(box, intersection))
+//         {
+//             if (maxInteractBox.size() < intersection.size())
+//             {
+//                 maxInteractBox = intersection;
+//                 maxInteractKey = key;
+//             }
+//         }
+//     }
 
-    cachedBox.push_back(maxInteractBox);
-    cachedKeys.push_back(maxInteractKey);
+//     cachedBox.push_back(maxInteractBox);
+//     cachedKeys.push_back(maxInteractKey);
 
-    if (current_depth == max_depth)
-    {
-        maxInteractBox.interactionCut(queryBox, regularBoxes);
-    } else {
-        std::vector<QueryBox> nextBoxes;
-        maxInteractBox.interactionCut(queryBox, nextBoxes);
-        for (auto &box : nextBoxes)
-        {
-            getMaxInteractBox(samePrefixKeys, box, max_depth, current_depth, regularBoxes, cachedBox, cachedKeys);
-        }
-    }   
-}
+//     if (current_depth == max_depth)
+//     {
+//         maxInteractBox.interactionCut(queryBox, regularBoxes);
+//     } else {
+//         std::vector<QueryBox> nextBoxes;
+//         maxInteractBox.interactionCut(queryBox, nextBoxes);
+//         for (auto &box : nextBoxes)
+//         {
+//             getMaxInteractBox(samePrefixKeys, box, max_depth, current_depth, regularBoxes, cachedBox, cachedKeys);
+//         }
+//     }   
+// }
 
 std::string KVCacheCommon::base64Encode(const std::vector<char> &data)
 {

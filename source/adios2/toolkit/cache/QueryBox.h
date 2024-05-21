@@ -7,7 +7,7 @@
 
 #include <set>
 #include "json.hpp"
-
+#include <iostream>
 #include "adios2/common/ADIOSTypes.h"
 
 namespace adios2
@@ -26,9 +26,13 @@ public:
         // sample key: "U3218446744073709551615__count_:_64_64_64___start_:_0_0_0__", count [64, 64, 64], start [0, 0, 0]
         // using Dims = std::vector<size_t>;
         auto lf_ExtractDimensions = [](const std::string &key, const std::string &delimiter) -> Dims {
-            size_t pos = key.find(delimiter);
-            size_t end = key.find("__", pos + delimiter.length());
+            std::cout << "key: " << key << std::endl;
+            std::cout << "delimiter: " << delimiter << std::endl;
+            size_t const pos = key.find(delimiter);
+            size_t const end = key.find("__", pos + delimiter.length());
+            std::cout << "pos: " << pos << " end: " << end << std::endl;
             std::string dimStr = key.substr(pos + delimiter.length(), end - pos - delimiter.length());
+            std::cout << "dimStr: " << dimStr << std::endl;
             Dims dimensions;
             std::istringstream dimStream(dimStr);
             std::string token;
@@ -93,6 +97,8 @@ public:
                 return false;
             }
         }
+        intersection.start.resize(start.size());
+        intersection.count.resize(count.size());
         for (size_t i = 0; i < start.size(); ++i)
         {
             intersection.start[i] = std::max(start[i], box.start[i]);
@@ -188,6 +194,79 @@ public:
             }
             interactionCut(remainingBox1, regularBoxes);
         }
+    }
+
+    void getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBox, std::vector<std::string> &cachedKeys)
+    {
+        if (current_depth > max_depth)
+        {
+            return;
+        }
+        current_depth++;
+        QueryBox maxInteractBox;
+        std::string maxInteractKey;
+        for (auto &key : samePrefixKeys)
+        {
+            std::cout << "key11111: " << key << " Current Depth: " << current_depth << std::endl;
+            QueryBox const box(key);
+            QueryBox intersection;
+            if (this->isInteracted(box, intersection))
+            {
+                if (maxInteractBox.size() < intersection.size())
+                {
+                    maxInteractBox = intersection;
+                    maxInteractKey = key;
+                }
+            }
+        }
+
+        std::cout << "pushing maxInteractBox: " << maxInteractBox.toString() << "key: " << maxInteractKey << "size: " << maxInteractBox.size() << std::endl;
+        std::cout << "maxInteractBox.count size: " << maxInteractBox.count.size() << std::endl;
+        
+        if (maxInteractBox.count.size() == 0)
+        {
+            return;
+        }
+
+        cachedBox.push_back(maxInteractBox);
+        cachedKeys.push_back(maxInteractKey);
+
+        if (current_depth == max_depth)
+        {
+            maxInteractBox.interactionCut(*this, regularBoxes);
+        } else {
+            std::vector<QueryBox> nextBoxes;
+            maxInteractBox.interactionCut(*this, nextBoxes);
+            for (auto &box : nextBoxes)
+            {
+                box.getMaxInteractBox(samePrefixKeys, max_depth, current_depth, regularBoxes, cachedBox, cachedKeys);
+            }
+        }   
+    }
+
+    // rewrite toString
+    std::string toString() const
+    {
+        std::string str = "Box start: [";
+        for (size_t i = 0; i < start.size(); ++i)
+        {
+            str += std::to_string(start[i]);
+            if (i != start.size() - 1)
+            {
+                str += ", ";
+            }
+        }
+        str += "], count: [";
+        for (size_t i = 0; i < count.size(); ++i)
+        {
+            str += std::to_string(count[i]);
+            if (i != count.size() - 1)
+            {
+                str += ", ";
+            }
+        }
+        str += "]";
+        return str;
     }
     
 };

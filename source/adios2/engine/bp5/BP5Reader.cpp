@@ -289,6 +289,7 @@ void BP5Reader::PerformRemoteGets()
     if (getenv("useKVCache"))
     {
         m_KVCacheCommon.openConnection();
+        std::cout << "kv cache version control: v1.1" << std::endl;
     }
     for (auto &Req : GetRequests)
     {
@@ -302,7 +303,6 @@ void BP5Reader::PerformRemoteGets()
         {
             if (m_KVCacheCommon.exists(cacheKey))
             {
-
 #define declare_type_get(T)                                                                        \
     if (varType == helper::GetDataType<T>())                                                       \
     {                                                                                              \
@@ -315,13 +315,42 @@ void BP5Reader::PerformRemoteGets()
 #undef declare_type_get
                 continue;
             } else {
-                int max_depth = 1;
+                int max_depth = 8;
                 std::set<std::string> samePrefixKeys;
                 m_KVCacheCommon.keyPrefixExistence(keyPrefix, samePrefixKeys);
+                // print the size of samePrefixKeys
+                std::cout << "same prefix keys size: " << samePrefixKeys.size() << std::endl;
+                // print out samePrefixKeys
+                for (auto &key : samePrefixKeys)
+                {
+                    std::cout << "same prefix keys: " << key << std::endl;
+                }
                 std::vector<QueryBox> regularBoxes;
                 std::vector<QueryBox> cachedBoxes;
                 std::vector<std::string> cachedKeys;
-                m_KVCacheCommon.getMaxInteractBox(samePrefixKeys, targetBox, max_depth, 0, regularBoxes, cachedBoxes, cachedKeys);
+                if (samePrefixKeys.size() > 0)
+                {   
+                    std::cout << "same prefix keys size > 0" << std::endl;
+                    targetBox.getMaxInteractBox(samePrefixKeys, max_depth, 0, regularBoxes, cachedBoxes, cachedKeys);
+                } else {
+                    std::cout << "no same prefix keys" << std::endl;
+                    regularBoxes.push_back(targetBox);
+                }
+                // print out regularBoxes and cachedBoxes size
+                std::cout << "regularBoxes size: " << regularBoxes.size() << std::endl;
+                std::cout << "cachedBoxes size: " << cachedBoxes.size() << std::endl;
+
+                // print out regularBoxes and cachedBoxes by toString
+                for (int i = 0; i < regularBoxes.size(); i++)
+                {
+                    std::cout << "regular i box: " << regularBoxes[i].toString() << std::endl;
+                }
+
+                for (int i = 0; i < cachedBoxes.size(); i++)
+                {
+                    std::cout << "cached i box: " << cachedBoxes[i].toString() << std::endl;
+                }
+
 
 #define declare_type_full_contain(T)                                                               \
     if (varType == helper::GetDataType<T>())                                                       \
@@ -350,6 +379,7 @@ void BP5Reader::PerformRemoteGets()
 ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
 #undef declare_type_full_contain
 
+                continue;
 /*
                 bool fullContained = false;
                 for (auto &key : samePrefixKeys)
