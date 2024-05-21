@@ -16,7 +16,8 @@ if(NOT TARGET adios2_core)
 
     list(APPEND _components MPI)
   endif()
-
+  # set(CMAKE_PREFIX_PATH "/data/gc/ornl/ADIOS2-Cache/build" ${CMAKE_PREFIX_PATH})
+  set(CMAKE_PREFIX_PATH "/data/gc/ornl/ADIOS2-Cache/cmake-build-debug" ${CMAKE_PREFIX_PATH})
   find_package(ADIOS2 REQUIRED COMPONENTS ${_components})
 endif()
 
