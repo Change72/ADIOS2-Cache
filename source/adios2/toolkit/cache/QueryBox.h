@@ -26,13 +26,9 @@ public:
         // sample key: "U3218446744073709551615__count_:_64_64_64___start_:_0_0_0__", count [64, 64, 64], start [0, 0, 0]
         // using Dims = std::vector<size_t>;
         auto lf_ExtractDimensions = [](const std::string &key, const std::string &delimiter) -> Dims {
-            std::cout << "key: " << key << std::endl;
-            std::cout << "delimiter: " << delimiter << std::endl;
             size_t const pos = key.find(delimiter);
             size_t const end = key.find("__", pos + delimiter.length());
-            std::cout << "pos: " << pos << " end: " << end << std::endl;
             std::string dimStr = key.substr(pos + delimiter.length(), end - pos - delimiter.length());
-            std::cout << "dimStr: " << dimStr << std::endl;
             Dims dimensions;
             std::istringstream dimStream(dimStr);
             std::string token;
@@ -207,7 +203,7 @@ public:
         std::string maxInteractKey;
         for (auto &key : samePrefixKeys)
         {
-            std::cout << "key11111: " << key << " Current Depth: " << current_depth << std::endl;
+            // std::cout << "Same Prefix Keys: " << key << " Current Depth: " << current_depth << std::endl;
             QueryBox const box(key);
             QueryBox intersection;
             if (this->isInteracted(box, intersection))
@@ -220,13 +216,14 @@ public:
             }
         }
 
-        std::cout << "pushing maxInteractBox: " << maxInteractBox.toString() << "key: " << maxInteractKey << "size: " << maxInteractBox.size() << std::endl;
-        std::cout << "maxInteractBox.count size: " << maxInteractBox.count.size() << std::endl;
-        
         if (maxInteractBox.count.size() == 0)
         {
             return;
         }
+
+        std::cout << "=============================" << std::endl;
+        std::cout << "Current Depth: " << current_depth << " Target box: " << this->toString() << " Target box size: " << this->size() << std::endl;
+        std::cout << "Pushing maxInteractBox: " << maxInteractBox.toString() << " key: " << maxInteractKey << ", Interacted size: " << maxInteractBox.size() << std::endl;
 
         cachedBox.push_back(maxInteractBox);
         cachedKeys.push_back(maxInteractKey);

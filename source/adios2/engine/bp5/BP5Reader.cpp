@@ -289,7 +289,8 @@ void BP5Reader::PerformRemoteGets()
     if (getenv("useKVCache"))
     {
         m_KVCacheCommon.openConnection();
-        std::cout << "kv cache version control: v1.1" << std::endl;
+        // print the size of GetRequests
+        std::cout << "GetRequests size: " << GetRequests.size() << std::endl;
     }
     for (auto &Req : GetRequests)
     {
@@ -316,39 +317,47 @@ void BP5Reader::PerformRemoteGets()
                 continue;
             } else {
                 int max_depth = 8;
+                if (getenv("maxDepth"))
+                {
+                    max_depth = std::stoi(getenv("maxDepth"));
+                }
+                std::cout << "Setting max_depth is: " << max_depth << std::endl;
+
                 std::set<std::string> samePrefixKeys;
                 m_KVCacheCommon.keyPrefixExistence(keyPrefix, samePrefixKeys);
+
                 // print the size of samePrefixKeys
-                std::cout << "same prefix keys size: " << samePrefixKeys.size() << std::endl;
+                std::cout << "Same prefix keys size: " << samePrefixKeys.size() << std::endl;
                 // print out samePrefixKeys
                 for (auto &key : samePrefixKeys)
                 {
-                    std::cout << "same prefix keys: " << key << std::endl;
+                    std::cout << "Same prefix keys: " << key << std::endl;
                 }
+                
                 std::vector<QueryBox> regularBoxes;
                 std::vector<QueryBox> cachedBoxes;
                 std::vector<std::string> cachedKeys;
+
                 if (samePrefixKeys.size() > 0)
                 {   
-                    std::cout << "same prefix keys size > 0" << std::endl;
                     targetBox.getMaxInteractBox(samePrefixKeys, max_depth, 0, regularBoxes, cachedBoxes, cachedKeys);
                 } else {
-                    std::cout << "no same prefix keys" << std::endl;
                     regularBoxes.push_back(targetBox);
                 }
+
                 // print out regularBoxes and cachedBoxes size
-                std::cout << "regularBoxes size: " << regularBoxes.size() << std::endl;
-                std::cout << "cachedBoxes size: " << cachedBoxes.size() << std::endl;
+                std::cout << "Going to retrieve regular boxes size: " << regularBoxes.size() << std::endl;
+                std::cout << "Already cached boxes size: " << cachedBoxes.size() << std::endl;
 
                 // print out regularBoxes and cachedBoxes by toString
                 for (int i = 0; i < regularBoxes.size(); i++)
                 {
-                    std::cout << "regular i box: " << regularBoxes[i].toString() << std::endl;
+                    std::cout << "Regular box " << i << " : " << regularBoxes[i].toString() << " size: " << regularBoxes[i].size() << std::endl;
                 }
 
                 for (int i = 0; i < cachedBoxes.size(); i++)
                 {
-                    std::cout << "cached i box: " << cachedBoxes[i].toString() << std::endl;
+                    std::cout << "Cached box " << i << " : " << cachedBoxes[i].toString() << " size: " << cachedBoxes[i].size() << std::endl;
                 }
 
 
@@ -437,6 +446,7 @@ ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
     if (getenv("useKVCache"))
     {
         m_KVCacheCommon.closeConnection();
+        std::cout << "KVCache connection closed" << std::endl;
     }
 }
 

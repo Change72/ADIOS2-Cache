@@ -25,7 +25,8 @@ void KVCacheCommon::openConnection()
     }
     else
     {
-        std::cout << "Connected to kvcache server" << std::endl;
+        std::cout << "------------------------------------------------" << std::endl;
+        std::cout << "Connected to kvcache server. KV Cache Version Control: V1.1" << std::endl;
     }
 }
 
@@ -49,7 +50,7 @@ void KVCacheCommon::set(std::string key, const std::vector<T>& vec)
     }
     else
     {
-        std::cout << "SET: " << m_redisReply->str << std::endl;
+        std::cout << "SET Key: " << m_key << " Value size: " << vec.size() << std::endl;
         freeReplyObject(m_redisReply);
     }
 }
@@ -92,19 +93,19 @@ bool KVCacheCommon::exists(std::string key)
 {
     m_key = key;
     m_command = "EXISTS " + m_key;
-    std::cout << "EXISTS: " << m_command.c_str() << std::endl;
+    std::cout << "Try to find the key: IF EXISTS: " << m_command.c_str() << std::endl;
     // m_command = "EXISTS mytest";
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
     {
-        std::cout << "Key does not exist" << std::endl;
+        std::cout << "Key does not exist" << m_command.c_str() << std::endl;
         return false;
     }
     else
     {
         if (!m_redisReply->integer)
         {
-            std::cout << "Key does not exist" << std::endl;
+            std::cout << "Key does not exist" << m_command.c_str()  << std::endl;
             return false;
         }
         // std::cout << "EXISTS: " << m_redisReply->str << std::endl;
@@ -152,46 +153,6 @@ void KVCacheCommon::keyPrefixExistence(const std::string &key_prefix, std::set<s
         freeReplyObject(m_redisReply);
     }
 }
-
-// void KVCacheCommon::getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const QueryBox &queryBox, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBox, std::vector<std::string> &cachedKeys)
-// {
-//     if (current_depth > max_depth)
-//     {
-//         return;
-//     }
-//     current_depth++;
-//     QueryBox maxInteractBox;
-//     std::string maxInteractKey;
-//     for (auto &key : samePrefixKeys)
-//     {
-//         std::cout << "key111: " << key << std::endl;
-//         QueryBox const box(key);
-//         QueryBox intersection;
-//         if (queryBox.isInteracted(box, intersection))
-//         {
-//             if (maxInteractBox.size() < intersection.size())
-//             {
-//                 maxInteractBox = intersection;
-//                 maxInteractKey = key;
-//             }
-//         }
-//     }
-
-//     cachedBox.push_back(maxInteractBox);
-//     cachedKeys.push_back(maxInteractKey);
-
-//     if (current_depth == max_depth)
-//     {
-//         maxInteractBox.interactionCut(queryBox, regularBoxes);
-//     } else {
-//         std::vector<QueryBox> nextBoxes;
-//         maxInteractBox.interactionCut(queryBox, nextBoxes);
-//         for (auto &box : nextBoxes)
-//         {
-//             getMaxInteractBox(samePrefixKeys, box, max_depth, current_depth, regularBoxes, cachedBox, cachedKeys);
-//         }
-//     }   
-// }
 
 std::string KVCacheCommon::base64Encode(const std::vector<char> &data)
 {
