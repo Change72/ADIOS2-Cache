@@ -5,6 +5,7 @@ import numpy as np  # pylint: disable=import-error
 import matplotlib.pyplot as plt  # pylint: disable=import-error
 import matplotlib.gridspec as gridspec  # pylint: disable=import-error
 import decomp  # pylint: disable=import-error
+import time
 
 
 def SetupArgs():
@@ -128,6 +129,7 @@ def read_data(args, fr, start_coord, size_dims):
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     # fontsize on plot
     fontsize = 24
 
@@ -185,3 +187,13 @@ if __name__ == "__main__":
         plot_step = plot_step + 1
 
     fr.close()
+
+    # Record the end time
+    end_time = time.time()
+
+    # Calculate the elapsed time
+    elapsed_time = end_time - start_time
+
+    print(f"Elapsed Time: {elapsed_time} seconds")
+
+
