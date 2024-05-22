@@ -211,19 +211,16 @@ endif()
 
 set(ADIOS2_USE_Cache True)
 if (ADIOS2_USE_Cache)
-#  add_subdirectory(toolkit/cache)
-# Note: need to export LD_LIBRARY_PATH=/data/gc/ornl/hiredis-1.2.0/build:/data/gc/ornl/openssl:$LD_LIBRARY_PATH
-  set(HIREDIS_DIR "/data/gc/ornl/hiredis-1.2.0/")
-  include_directories(${HIREDIS_DIR})
-  set(HIREDIS_LIBRARY ${HIREDIS_DIR}/build/libhiredis.so)
-  target_link_libraries(adios2_core PRIVATE hiredis)
+  # Note: need to export LD_LIBRARY_PATH=/data/gc/ornl/hiredis-1.2.0/build:/data/gc/ornl/openssl:$LD_LIBRARY_PATH
+  if (HIREDIS_INCLUDE_DIR AND HIREDIS_LIBRARY)
+    include_directories(${HIREDIS_INCLUDE_DIR})
+    target_link_libraries(adios2_core PRIVATE ${HIREDIS_LIBRARY})
+  endif()
 
-  set(OPENSSL_DIR "/data/gc/ornl/openssl/")
-  set(OPENSSL_INCLUDE_DIR ${OPENSSL_DIR}/include)
-  set(OPENSSL_LIBRARY_SSL ${OPENSSL_DIR}/libssl.so)
-  set(OPENSSL_LIBRARY_CRYPTO ${OPENSSL_DIR}/libcrypto.so)
-  target_include_directories(adios2_core PRIVATE ${OPENSSL_INCLUDE_DIR})
-  target_link_libraries(adios2_core PRIVATE ${OPENSSL_LIBRARY_SSL} ${OPENSSL_LIBRARY_CRYPTO})
+  if (OPENSSL_INCLUDE_DIR AND OPENSSL_SSL_LIBRARY AND OPENSSL_CRYPTO_LIBRARY)
+    include_directories(${OPENSSL_INCLUDE_DIR})
+    target_link_libraries(adios2_core PRIVATE ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+  endif()
 endif ()
 
 if(ADIOS2_HAVE_Campaign)

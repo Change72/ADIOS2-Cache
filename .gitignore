@@ -44,4 +44,5 @@ CMakeSettings.json
 # gc
 .idea/
 build-python/
+build-cache/
 cmake-build-debug/
