@@ -597,6 +597,23 @@ elseif(ADIOS2_USE_Campaign)
   endif()
 endif()  
 
+# KVCache
+if(ADIOS2_USE_Cache STREQUAL AUTO)
+    find_package(hiredis REQUIRED)
+    find_package(OpenSSL REQUIRED)
+    if (hiredis_FOUND AND OpenSSL_FOUND)
+      message(STATUS "hiredis and OpenSSL found. Turn on KVCache")
+      set(ADIOS2_HAVE_Cache TRUE)
+    endif()
+elseif(ADIOS2_USE_Cache)
+    find_package(hiredis REQUIRED)
+    find_package(OpenSSL REQUIRED)
+    if (hiredis_FOUND AND OpenSSL_FOUND)
+      message(STATUS "hiredis and OpenSSL found. Turn on KVCache")
+      set(ADIOS2_HAVE_Cache TRUE)
+    endif()
+endif()
+
 # Multithreading
 find_package(Threads REQUIRED)
 

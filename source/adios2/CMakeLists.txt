@@ -124,10 +124,6 @@ add_library(adios2_core
   toolkit/aggregator/mpi/MPIChain.cpp
   toolkit/aggregator/mpi/MPIShmChain.cpp
 
-  toolkit/cache/KVCacheCommon.h
-  toolkit/cache/KVCacheCommon.inl
-#  toolkit/cache/KVCacheBase64.h
-#  toolkit/cache/KVCacheBase64.cpp
         )
 set_property(TARGET adios2_core PROPERTY EXPORT_NAME core)
 set_property(TARGET adios2_core PROPERTY OUTPUT_NAME adios2${ADIOS2_LIBRARY_SUFFIX}_core)
@@ -209,18 +205,11 @@ if (ADIOS2_HAVE_SST)
   add_subdirectory(toolkit/remote)
 endif()
 
-set(ADIOS2_USE_Cache True)
-if (ADIOS2_USE_Cache)
-  # Note: need to export LD_LIBRARY_PATH=/data/gc/ornl/hiredis-1.2.0/build:/data/gc/ornl/openssl:$LD_LIBRARY_PATH
-  if (HIREDIS_INCLUDE_DIR AND HIREDIS_LIBRARY)
-    include_directories(${HIREDIS_INCLUDE_DIR})
-    target_link_libraries(adios2_core PRIVATE ${HIREDIS_LIBRARY})
-  endif()
-
-  if (OPENSSL_INCLUDE_DIR AND OPENSSL_SSL_LIBRARY AND OPENSSL_CRYPTO_LIBRARY)
-    include_directories(${OPENSSL_INCLUDE_DIR})
-    target_link_libraries(adios2_core PRIVATE ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
-  endif()
+if (ADIOS2_HAVE_Cache)
+  message(STATUS "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ADIOS2_USE_Cache is ON")
+  target_sources(adios2_core PRIVATE  toolkit/cache/KVCacheCommon.h
+    toolkit/cache/KVCacheCommon.inl)
+  target_link_libraries(adios2_core PRIVATE hiredis OpenSSL::SSL OpenSSL::Crypto)
 endif ()
 
 if(ADIOS2_HAVE_Campaign)
