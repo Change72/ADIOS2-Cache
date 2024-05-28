@@ -206,10 +206,9 @@ if (ADIOS2_HAVE_SST)
 endif()
 
 if (ADIOS2_HAVE_Cache)
-  message(STATUS "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: ADIOS2_USE_Cache is ON")
   target_sources(adios2_core PRIVATE  toolkit/cache/KVCacheCommon.h
     toolkit/cache/KVCacheCommon.inl)
-  target_link_libraries(adios2_core PRIVATE hiredis OpenSSL::SSL OpenSSL::Crypto)
+  target_link_libraries(adios2_core PRIVATE hiredis::hiredis OpenSSL::SSL OpenSSL::Crypto)
 endif ()
 
 if(ADIOS2_HAVE_Campaign)
