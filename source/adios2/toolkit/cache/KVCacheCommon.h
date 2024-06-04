@@ -49,12 +49,6 @@ public:
 
     inline void keyPrefixExistence(const std::string &key_prefix, std::set<std::string> &keys);
 
-    inline void getMaxInteractBox(const std::set<std::string> &samePrefixKeys, const QueryBox &queryBox, const size_t &max_depth, size_t current_depth, std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes, std::vector<std::string> &cachedKeys);
-
-    inline std::string base64Encode(const std::vector<char>& data);
-
-    inline std::vector<char> base64Decode(const std::string& encoded);
-
     template <typename T>
     void encodeVector(const std::vector<T>& vec, std::string& encodedString);
 
