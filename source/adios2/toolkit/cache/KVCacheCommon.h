@@ -6,8 +6,10 @@
 #define ADIOS2_KVCACHECOMMON_H
 #include <hiredis/hiredis.h>
 #include "adios2/toolkit/cache/QueryBox.h"
-#include <iostream>
-
+#include <adios2sys/Base64.h>
+#include <cstring>  // For memcpy
+#include <vector>
+#include <string>
 
 // namespace adios2::KVCache
 
@@ -63,6 +65,6 @@ public:
 
 }; // adios2
 
-#include "KVCacheCommon.inl"
+#include "KVCacheCommon.tcc"
 
 #endif // ADIOS2_KVCACHECOMMON_H

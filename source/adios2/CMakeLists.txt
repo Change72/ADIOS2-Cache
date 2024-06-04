@@ -123,8 +123,7 @@ add_library(adios2_core
   toolkit/aggregator/mpi/MPIAggregator.cpp
   toolkit/aggregator/mpi/MPIChain.cpp
   toolkit/aggregator/mpi/MPIShmChain.cpp
-
-        )
+)
 set_property(TARGET adios2_core PROPERTY EXPORT_NAME core)
 set_property(TARGET adios2_core PROPERTY OUTPUT_NAME adios2${ADIOS2_LIBRARY_SUFFIX}_core)
 
@@ -205,10 +204,10 @@ if (ADIOS2_HAVE_SST)
   add_subdirectory(toolkit/remote)
 endif()
 
-if (ADIOS2_HAVE_Cache)
+if (ADIOS2_HAVE_KVCACHE)
   target_sources(adios2_core PRIVATE  toolkit/cache/KVCacheCommon.h
-    toolkit/cache/KVCacheCommon.inl)
-  target_link_libraries(adios2_core PRIVATE hiredis::hiredis OpenSSL::SSL OpenSSL::Crypto)
+    toolkit/cache/KVCacheCommon.tcc)
+  target_link_libraries(adios2_core PRIVATE hiredis::hiredis)
 endif ()
 
 if(ADIOS2_HAVE_Campaign)
@@ -434,7 +433,7 @@ else()
 endif()
 
 # The main "adios2" target provides all interfaces.
-add_library(adios2 INTERFACE toolkit/cache/KVCacheBase64.h)
+add_library(adios2 INTERFACE)
 target_link_libraries(adios2 INTERFACE
   ${maybe_adios2_c_mpi} adios2_c
   ${maybe_adios2_cxx11_mpi} adios2_cxx11

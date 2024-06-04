@@ -6,9 +6,9 @@
 #define ADIOS2_KVCACHE_QUERYBOX_H
 
 #include <set>
-#include "json.hpp"
 #include <iostream>
-#include "adios2/common/ADIOSTypes.h"
+#include <adios2/common/ADIOSTypes.h>
+#include <nlohmann_json.hpp>
 
 namespace adios2
 {
@@ -53,23 +53,13 @@ public:
         return s;
     }
 
-    // Serialize QueryBox to a JSON string
+    // Serialize QueryBox to a string, like __count_:_64_64_64___start_:_0_0_0__
     static std::string serializeQueryBox(const QueryBox &box)
     {
         nlohmann::json jsonBox;
         jsonBox["start"] = box.start;
         jsonBox["count"] = box.count;
         return jsonBox.dump();
-    }
-
-    // Deserialize JSON string to a QueryBox
-    QueryBox deserializeQueryBox(const std::string &jsonString)
-    {
-        nlohmann::json jsonBox = nlohmann::json::parse(jsonString);
-        QueryBox box;
-        box.start = jsonBox["start"].get<adios2::Dims>();
-        box.count = jsonBox["count"].get<adios2::Dims>();
-        return box;
     }
 
     // determine if a query box is equal to another query box

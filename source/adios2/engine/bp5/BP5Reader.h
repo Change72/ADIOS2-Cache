@@ -21,7 +21,7 @@
 #include "adios2/toolkit/remote/Remote.h"
 #include "adios2/toolkit/transportman/TransportMan.h"
 
-#ifdef ADIOS2_HAVE_Cache // external dependencies
+#ifdef ADIOS2_HAVE_KVCACHE // external dependencies
 #include "adios2/toolkit/cache/KVCacheCommon.h"
 #endif
 
@@ -100,7 +100,7 @@ private:
     Remote m_Remote;
     bool m_WriterIsActive = true;
     adios2::profiling::JSONProfiler m_JSONProfiler;
-    #ifdef ADIOS2_HAVE_Cache
+    #ifdef ADIOS2_HAVE_KVCACHE
     KVCacheCommon m_KVCacheCommon;
     #endif
     /** used for per-step reads, TODO: to be moved to BP5Deserializer */

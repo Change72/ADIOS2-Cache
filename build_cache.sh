@@ -6,7 +6,7 @@
 
 if [ -z ${BUILD_DIR} ]
 then
-    BUILD_DIR=${PWD}/build-cache
+    BUILD_DIR=${PWD}/build-cache-test
 fi
 
 if [ ! -d ${BUILD_DIR} ]
@@ -17,9 +17,14 @@ fi
 cd ${BUILD_DIR}
 
 SW_DIR=${BUILD_DIR}/sw
+if [ ! -d ${SW_DIR} ]
+then
+    mkdir -p ${SW_DIR}
+fi
+cd ${SW_DIR}
 
 # redis - in-memory data structure store
-redis_dir=${BUILD_DIR}/redis
+redis_dir=${SW_DIR}/redis
 if [ ! -d ${redis_dir} ]
 then
     git clone https://github.com/redis/redis.git ${redis_dir}
@@ -38,30 +43,15 @@ then
 fi
 
 cd ${BUILD_DIR}
-
-# openssl - TLS/SSL and crypto library
-openssl_dir=${BUILD_DIR}/openssl
-if [ ! -d ${openssl_dir} ]
-then
-    git clone https://github.com/openssl/openssl.git ${openssl_dir}
-    cd ${openssl_dir}
-    git checkout tags/openssl-3.2.0
-    ./Configure --prefix=${SW_DIR}/openssl
-    make -j32
-    make install
-    cd -
-fi
-
-echo "${SW_DIR}/hiredis;${SW_DIR}/openssl"
-
 cmake .. -DADIOS2_USE_Cache=ON \
+        -DADIOS2_USE_Python=ON \
         -DCMAKE_PREFIX_PATH=${SW_DIR} \
-        -DOPENSSL_CRYPTO_LIBRARY="${SW_DIR}/openssl/lib64/libcrypto.so" \
-        -DOPENSSL_SSL_LIBRARY="${SW_DIR}/openssl/lib64/libssl.so"
+        -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2
 
 make -j32
-
-nohup ./bin/remote_server > remote_server.log 2>&1 &
+make install
+cd -
+# nohup ./bin/remote_server > remote_server.log 2>&1 &
 
 export DoRemote=1
 export useKVCache=1

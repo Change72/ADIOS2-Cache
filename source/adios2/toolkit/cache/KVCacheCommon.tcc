@@ -1,9 +1,8 @@
 //
 // Created by cguo51 on 12/30/23.
 //
-#ifndef KVCACHECOMMON_INL
-#define KVCACHECOMMON_INL
-#include "adios2/toolkit/cache/KVCacheBase64.h"
+#ifndef KVCACHECOMMON_TCC
+#define KVCACHECOMMON_TCC
 
 namespace adios2
 {
@@ -154,66 +153,38 @@ void KVCacheCommon::keyPrefixExistence(const std::string &key_prefix, std::set<s
     }
 }
 
-std::string KVCacheCommon::base64Encode(const std::vector<char> &data)
-{
-    BIO *bio, *b64;
-    BUF_MEM *bptr;
+template <typename T>
+void KVCacheCommon::encodeVector(const std::vector<T>& vec, std::string& encodedString) {
+    size_t vecSize = vec.size() * sizeof(T);
+    const unsigned char* vecBytes = reinterpret_cast<const unsigned char*>(vec.data());
 
-    b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    bio = BIO_new(BIO_s_mem());
-    bio = BIO_push(b64, bio);
+    size_t encodedSize = vecSize * 3 / 2;
+    std::vector<unsigned char> encodedBytes(encodedSize);
 
-    BIO_write(bio, data.data(), static_cast<int>(data.size()));
-    BIO_flush(bio);
-    BIO_get_mem_ptr(bio, &bptr);
+    size_t sizeAfterEncoded = adios2sysBase64_Encode(vecBytes, vecSize, encodedBytes.data(), 0);
 
-    std::string result(bptr->data, bptr->length);
+    // Resize the vector to the actual size
+    encodedBytes.resize(sizeAfterEncoded);
 
-    BIO_free_all(bio);
-
-    return result;
-}
-
-std::vector<char> KVCacheCommon::base64Decode(const std::string &encoded)
-{
-    BIO *bio, *b64;
-    std::vector<char> result(encoded.size());
-
-    b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    bio = BIO_new_mem_buf(encoded.c_str(), static_cast<int>(encoded.size()));
-    bio = BIO_push(b64, bio);
-
-    int decodedLength = BIO_read(bio, result.data(), static_cast<int>(result.size()));
-    result.resize(decodedLength);
-
-    BIO_free_all(bio);
-
-    return result;
+    // Convert the encoded bytes to a string
+    encodedString.assign(encodedBytes.begin(), encodedBytes.end());
 }
 
 template <typename T>
-void KVCacheCommon::encodeVector(const std::vector<T> &vec, std::string &encodedString)
-{
-    std::vector<char> rawData(reinterpret_cast<const char *>(vec.data()),
-                              reinterpret_cast<const char *>(vec.data() + vec.size()));
-    encodedString = base64Encode(rawData);
-}
+void KVCacheCommon::decodeVector(const std::string& str, std::vector<T>& vec) {
+    size_t decodedSize = str.size() * 2;
+    std::vector<unsigned char> decodedBytes(decodedSize);
 
-template <typename T>
-void KVCacheCommon::decodeVector(const std::string &str, std::vector<T> &vec)
-{
-    std::vector<char> rawData = base64Decode(str);
+    size_t sizeAfterDecoded = adios2sysBase64_Decode(reinterpret_cast<const unsigned char*>(str.data()), str.size(), decodedBytes.data(), decodedSize);
 
-    // Calculate the number of elements based on the total size of rawData
-    size_t numElements = rawData.size() / sizeof(T);
+    // Resize the vector to the actual size
+    decodedBytes.resize(sizeAfterDecoded);
 
-    // Construct the result vector using the correct size
-    std::vector<T> result(reinterpret_cast<const T *>(rawData.data()),
-        reinterpret_cast<const T *>(rawData.data() + numElements * sizeof(T)));
-    vec = result;
+    // Copy the decoded bytes to the vector
+    vec.resize(sizeAfterDecoded / sizeof(T));
+    memcpy(vec.data(), decodedBytes.data(), sizeAfterDecoded);
+
 }
 
 }; // namespace adios2
-#endif // KVCACHECOMMON_INL
+#endif // KVCACHECOMMON_TCC

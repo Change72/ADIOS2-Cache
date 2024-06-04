@@ -286,9 +286,11 @@ void BP5Reader::PerformRemoteGets()
 {
     // TP startGenerate = NOW();
     auto GetRequests = m_BP5Deserializer->PendingGetRequests;
-    #ifdef ADIOS2_HAVE_Cache // external dependencies
+    std::cout << "GetRequests size: " << GetRequests.size() << std::endl;
+    #ifdef ADIOS2_HAVE_KVCACHE // external dependencies
     if (getenv("useKVCache"))
     {
+        std::cout << "Using KVCache" << std::endl;
         m_KVCacheCommon.openConnection();
         // print the size of GetRequests
         std::cout << "GetRequests size: " << GetRequests.size() << std::endl;
@@ -296,7 +298,7 @@ void BP5Reader::PerformRemoteGets()
     #endif
     for (auto &Req : GetRequests)
     {
-        #ifdef ADIOS2_HAVE_Cache // external dependencies
+        #ifdef ADIOS2_HAVE_KVCACHE // external dependencies
         const DataType varType = m_IO.InquireVariableType(Req.VarName);
         QueryBox targetBox(Req.Start, Req.Count);
         size_t numOfElements = targetBox.size();
@@ -432,7 +434,7 @@ ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
         #endif
         m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
 
-        #ifdef ADIOS2_HAVE_Cache // external dependencies
+        #ifdef ADIOS2_HAVE_KVCACHE // external dependencies
         if (getenv("useKVCache"))
         {
 
@@ -450,7 +452,7 @@ ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
         #endif
 
     }
-    #ifdef ADIOS2_HAVE_Cache // external dependencies
+    #ifdef ADIOS2_HAVE_KVCACHE // external dependencies
     if (getenv("useKVCache"))
     {
         m_KVCacheCommon.closeConnection();
