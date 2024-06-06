@@ -211,7 +211,7 @@ public:
             return;
         }
 
-        std::cout << "=============================" << std::endl;
+        std::cout << "===============================================================================" << std::endl;
         std::cout << "Current Depth: " << current_depth << " Target box: " << this->toString() << " Target box size: " << this->size() << std::endl;
         std::cout << "Pushing maxInteractBox: " << maxInteractBox.toString() << " key: " << maxInteractKey << ", Interacted size: " << maxInteractBox.size() << std::endl;
 

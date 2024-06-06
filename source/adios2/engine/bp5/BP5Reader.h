@@ -21,7 +21,7 @@
 #include "adios2/toolkit/remote/Remote.h"
 #include "adios2/toolkit/transportman/TransportMan.h"
 
-#ifdef ADIOS2_HAVE_KVCACHE // external dependencies
+#ifdef ADIOS2_HAVE_KVCACHE
 #include "adios2/toolkit/cache/KVCacheCommon.h"
 #endif
 

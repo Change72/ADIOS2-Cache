@@ -12,44 +12,38 @@ void KVCacheCommon::openConnection()
     m_redisContext = redisConnect(m_host.c_str(), m_port);
     if (m_redisContext == NULL || m_redisContext->err)
     {
+        std::cout << "Error to connect to kvcache server: " << m_redisContext->errstr << std::endl;
         if (m_redisContext)
         {
-            std::cout << "Error: " << m_redisContext->errstr << std::endl;
             redisFree(m_redisContext);
-        }
-        else
-        {
-            std::cout << "Can't allocate kvcache context" << std::endl;
         }
     }
     else
     {
-        std::cout << "------------------------------------------------" << std::endl;
-        std::cout << "Connected to kvcache server. KV Cache Version Control: V1.1" << std::endl;
+        std::cout << "------------------------------------------------------------" << std::endl;
+        std::cout << "Connected to kvcache server. KV Cache Version Control: V1.0" << std::endl;
     }
 }
 
 void KVCacheCommon::closeConnection()
 {
     redisFree(m_redisContext);
+    std::cout << "KVCache connection closed" << std::endl;
 }
 
 template <typename T>
 void KVCacheCommon::set(std::string key, const std::vector<T>& vec)
 {
-    m_key = key;
     encodeVector(vec, m_value);
-//    m_key = "test";
-//    m_value = "test";
-    m_command = "SET " + m_key + " " + m_value;
+    m_command = "SET " + key + " " + m_value;
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
     {
-        std::cout << "Error: " << m_redisContext->errstr << std::endl;
+        std::cout << "Error to set key: " << key << std::endl;
     }
     else
     {
-        std::cout << "SET Key: " << m_key << " Value size: " << vec.size() << std::endl;
+        std::cout << "SET Key: " << key << " Value size: " << vec.size() << std::endl;
         freeReplyObject(m_redisReply);
     }
 }
@@ -57,16 +51,14 @@ void KVCacheCommon::set(std::string key, const std::vector<T>& vec)
 template <typename T>
 void KVCacheCommon::get(std::string key, std::vector<T>& vec)
 {
-    m_key = key;
-    m_command = "GET " + m_key;
+    m_command = "GET " + key;
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
     {
-        std::cout << "Error: " << m_redisContext->errstr << std::endl;
+        std::cout << "Error to get key: " << key << std::endl;
     }
     else
     {
-        // std::cout << "GET: " << m_redisReply->str << std::endl;
         decodeVector(m_redisReply->str, vec);
         freeReplyObject(m_redisReply);
     }
@@ -74,40 +66,34 @@ void KVCacheCommon::get(std::string key, std::vector<T>& vec)
 
 void KVCacheCommon::del(std::string key)
 {
-    m_key = key;
-    m_command = "DEL " + m_key;
+    m_command = "DEL " + key;
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
     {
-        std::cout << "Error: " << m_redisContext->errstr << std::endl;
+        std::cout << "Error to delete key: " << key << std::endl;
     }
     else
     {
-        std::cout << "DEL: " << m_redisReply->str << std::endl;
         freeReplyObject(m_redisReply);
     }
 }
 
 bool KVCacheCommon::exists(std::string key)
 {
-    m_key = key;
-    m_command = "EXISTS " + m_key;
-    std::cout << "Try to find the key: IF EXISTS: " << m_command.c_str() << std::endl;
-    // m_command = "EXISTS mytest";
+    m_command = "EXISTS " + key;
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
     {
-        std::cout << "Key does not exist" << m_command.c_str() << std::endl;
+        std::cout << "The Key: " << key << " does not exist" << std::endl;
         return false;
     }
     else
     {
         if (!m_redisReply->integer)
         {
-            std::cout << "Key does not exist" << m_command.c_str()  << std::endl;
+            std::cout << "The Key: " << key << " does not exist" << std::endl;
             return false;
         }
-        // std::cout << "EXISTS: " << m_redisReply->str << std::endl;
         freeReplyObject(m_redisReply);
         return true;
     }
@@ -141,7 +127,7 @@ void KVCacheCommon::keyPrefixExistence(const std::string &key_prefix, std::set<s
     m_redisReply = (redisReply *)redisCommand(m_redisContext, m_command.c_str());
     if (m_redisReply == NULL)
     {
-        std::cout << "Error: " << m_redisContext->errstr << std::endl;
+        std::cout << "Error to get keys with prefix: " << key_prefix << std::endl;
     }
     else
     {
