@@ -4,7 +4,10 @@
 # Attention: hiredis cannot be installed by apt-get, since the default version is too old (libhiredis0.14 (= 0.14.1-2)).
 #            We need to build it from source code. You can also use the following scripts to install hiredis (v1.2.0).
 
-# sample usage: in project home directory, 'source examples/cache/build_cache.sh --build --start'
+# sample usage: in project home directory:
+# source examples/cache/build_cache.sh --build 
+# source examples/cache/build_cache.sh --start
+# source examples/cache/build_cache.sh --stop
 
 if [ -z ${BUILD_DIR} ]
 then
@@ -68,6 +71,10 @@ stop_services() {
     echo "Stopping services..."
     pkill -f redis-server
     pkill -f remote_server
+    unset DoRemote
+    unset useKVCache
+    unset PYTHONPATH
+    unset LD_LIBRARY_PATH
     echo "Services stopped."
 }
 
