@@ -12,7 +12,20 @@
 
 #include "../Transport.h"
 #include "adios2/common/ADIOSConfig.h"
+#ifdef _MSC_VER
+#define FD_SETSIZE 1024
+#include <process.h>
+#include <time.h>
+#include <winsock2.h>
+
+#include <windows.h>
+#define getpid() _getpid()
+#else
+#include <sys/socket.h>
+
 #include <netinet/in.h>
+#define SOCKET int
+#endif
 
 namespace adios2
 {
@@ -68,11 +81,11 @@ public:
 
 private:
     /** POSIX file handle returned by Open */
-    int m_socketFileDescriptor = -1;
+    SOCKET m_socketFileDescriptor = -1;
     int m_Errno = 0;
     bool m_IsOpening = false;
     /* if filename is very lomg, we can get lout from array boundaries */
-    char request_template[128] = "GET %s HTTP/1.1\r\nHost: %s\r\nRange: bytes=%d-%d\r\n\r\n";
+    std::string request_template = "GET %s HTTP/1.1\r\nHost: %s\r\nRange: bytes=%d-%d\r\n\r\n";
     std::string m_hostname = "localhost";
     int m_server_port = 9999;
     struct sockaddr_in sockaddr_in;

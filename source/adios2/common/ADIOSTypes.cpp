@@ -18,6 +18,23 @@
 namespace adios2
 {
 
+std::string ToString(MemorySpace value)
+{
+    switch (value)
+    {
+    case MemorySpace::Detect:
+        return "MemorySpace::Detect";
+    case MemorySpace::Host:
+        return "MemorySpace::Host";
+#ifdef ADIOS2_HAVE_GPU_SUPPORT
+    case MemorySpace::GPU:
+        return "MemorySpace::GPU";
+#endif
+    default:
+        return "ToString: Unknown MemorySpace";
+    }
+}
+
 std::string ToString(ShapeID value)
 {
     switch (value)
@@ -387,6 +404,27 @@ int TypeElementSize(DataType adiosvartype)
         return 16;
     default:
         return -1;
+    }
+}
+
+bool TypeHasMinMax(DataType adiosvartype)
+{
+    switch (adiosvartype)
+    {
+    case DataType::UInt8:
+    case DataType::Int8:
+    case DataType::UInt16:
+    case DataType::Int16:
+    case DataType::UInt32:
+    case DataType::Int32:
+    case DataType::UInt64:
+    case DataType::Int64:
+    case DataType::Float:
+    case DataType::Double:
+    case DataType::LongDouble:
+        return true;
+    default:
+        return false;
     }
 }
 

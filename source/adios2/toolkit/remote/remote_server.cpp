@@ -18,11 +18,28 @@
 #include <regex>
 #include <sys/stat.h>  // open, fstat
 #include <sys/types.h> // open
-#include <unistd.h>    // write, close, ftruncate
+#ifndef _MSC_VER
+#include <unistd.h> // write, close, ftruncate
+
+static int fd_is_valid(int fd) { return fcntl(fd, F_GETFD) != -1 || errno != EBADF; }
+
+#else
+#include <io.h>
+#define strdup _strdup
+#define strlen _strlen
+#define fileno _fileno
+#define getpid _getpid
+#define unlink _unlink
+#define close _close
+#define sleep(x) Sleep(x * 1000);
+#define read _read
+#define lseek _lseek
+#define open _open
+#endif
 
 #include "remote_common.h"
 
-using namespace adios2::RemoteCommon;
+using namespace adios2::EVPathRemoteCommon;
 
 using namespace adios2::core;
 using namespace adios2;
@@ -48,7 +65,7 @@ std::string readable_size(uint64_t size)
         s = s / 1024;
         idx++;
     }
-    int point = r / 100;
+    int point = (int)(r / 100);
     std::ostringstream out;
     out << "" << s;
     if (point != 0)
@@ -80,8 +97,9 @@ public:
     std::string m_FileName;
     size_t m_BytesSent = 0;
     size_t m_OperationCount = 0;
-    RemoteFileMode m_mode = RemoteCommon::RemoteFileMode::RemoteOpen;
-    AnonADIOSFile(std::string FileName, RemoteCommon::RemoteFileMode mode, bool RowMajorArrays)
+    RemoteFileMode m_mode = EVPathRemoteCommon::RemoteFileMode::RemoteOpen;
+    AnonADIOSFile(std::string FileName, EVPathRemoteCommon::RemoteFileMode mode,
+                  bool RowMajorArrays)
     {
         Mode adios_read_mode = adios2::Mode::Read;
         m_FileName = FileName;
@@ -300,11 +318,29 @@ static void ReadRequestHandler(CManager cm, CMConnection conn, void *vevent, voi
     last_service_time = std::chrono::steady_clock::now();
     if (f->m_CurrentOffset != ReadMsg->Offset)
     {
-        lseek(f->m_FileDescriptor, ReadMsg->Offset, SEEK_SET);
+        lseek(f->m_FileDescriptor, (long)ReadMsg->Offset, SEEK_SET);
         f->m_CurrentOffset = ReadMsg->Offset;
     }
     char *tmp = (char *)malloc(ReadMsg->Size);
-    read(f->m_FileDescriptor, tmp, ReadMsg->Size);
+    size_t remaining = ReadMsg->Size;
+    char *pointer = tmp;
+    while (remaining > 0)
+    {
+        ssize_t ret = read(f->m_FileDescriptor, pointer, (int)remaining);
+        if (ret <= 0)
+        {
+            // EOF or error,  should send a message back, but we haven't define error handling yet
+            std::cout << "Read failed! BAD!" << std::endl;
+            // instead free tmp and return;
+            free(tmp);
+            return;
+        }
+        else
+        {
+            remaining -= ret;
+            pointer += ret;
+        }
+    }
     f->m_CurrentOffset += ReadMsg->Size;
     _ReadResponseMsg Response;
     memset(&Response, 0, sizeof(Response));
@@ -480,7 +516,7 @@ static void timer_start(void *param, unsigned int interval)
             auto secs =
                 std::chrono::duration_cast<std::chrono::seconds>(now - last_service_time).count();
             auto x = now + std::chrono::milliseconds(interval);
-            if (server_timeout(param, secs))
+            if (server_timeout(param, (int)secs))
                 return;
             std::this_thread::sleep_until(x);
         }
@@ -525,8 +561,9 @@ int main(int argc, char **argv)
         else
         {
             fprintf(stderr, "Unknown argument \"%s\"\n", argv[i]);
-            fprintf(stderr, "Usage:  remote_server [-background] [-kill_server] [-no_timeout] "
-                            "[-status] [-v] [-q]\n");
+            fprintf(stderr,
+                    "Usage:  adios2_remote_server [-background] [-kill_server] [-no_timeout] "
+                    "[-status] [-v] [-q]\n");
             exit(1);
         }
     }
@@ -547,6 +584,36 @@ int main(int argc, char **argv)
         {
             printf("Forking server to background\n");
         }
+#ifdef _MSC_VER
+        STARTUPINFO si;
+        PROCESS_INFORMATION pi;
+        char comm_line[8191];
+
+        ZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        ZeroMemory(&pi, sizeof(pi));
+        char module[MAX_PATH];
+        GetModuleFileName(NULL, &module[0], MAX_PATH);
+        int i = 1;
+        strcpy(comm_line, module);
+        strcat(comm_line, " ");
+        if (!CreateProcess(module, comm_line,
+                           NULL,  // Process handle not inheritable
+                           NULL,  // Thread handle not inheritable
+                           FALSE, // Set handle inheritance to FALSE
+                           0,     // No creation flags
+                           NULL,  // Use parent's environment block
+                           NULL,  // Use parent's starting directory
+                           &si,   // Pointer to STARTUPINFO structure
+                           &pi))
+        {
+            printf("CreateProcess failed (%d).\n", GetLastError());
+            //	    printf("Args were argv[0] = %s\n", args[0]);
+            //	    printf("Args were argv[1] = %s, argv[2] = %s\n", args[1], args[2]);
+            exit(1);
+        }
+        exit(0);
+#else
         if (fork() != 0)
         {
             /* I'm the parent, wait a sec to let the child start, then exit */
@@ -555,9 +622,26 @@ int main(int argc, char **argv)
         }
         /* I'm the child, close IO FDs so that ctest continues.  No verbosity here */
         verbose = 0;
-        close(0);
-        close(1);
-        close(2);
+
+        //  Why close a bunch of FDs here?  Well, if we've linked with XRootD, stderr might have
+        //  been dup()'d in library initialization.  We don't need those FDs and we have to close
+        //  them to make sure we disassociate from the CTest parent (or else fixture startup hangs).
+        //  It doesn't seem to work to close them before the fork, so we close them afterwards.
+        for (int fd = 0; fd <= 16; fd++)
+        {
+            if (fd_is_valid(fd))
+            {
+                // OK, fd is valid, should we close it?
+                if ((lseek(fd, 0, SEEK_CUR) == -1) && (errno == ESPIPE))
+                {
+                    // In the circumstances we care about (running under CTest), we want to close
+                    // FDs that are pipes.  The condition above tests for that and we should get
+                    // here only if it's a pipe.
+                    close(fd);
+                }
+            }
+        }
+#endif
     }
 
     cm = CManager_create();

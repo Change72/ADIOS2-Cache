@@ -4,8 +4,6 @@
  *
  * BP5Reader.h
  *
- *  Created on: Aug 1, 2018
- *      Author: Lipeng Wan wanl@ornl.gov
  */
 
 #ifndef ADIOS2_ENGINE_BP5_BP5READER_H_
@@ -18,6 +16,7 @@
 #include "adios2/helper/adiosComm.h"
 #include "adios2/helper/adiosRangeFilter.h"
 #include "adios2/toolkit/format/bp5/BP5Deserializer.h"
+#include "adios2/toolkit/format/buffer/heap/BufferMalloc.h"
 #include "adios2/toolkit/remote/Remote.h"
 #include "adios2/toolkit/transportman/TransportMan.h"
 
@@ -62,6 +61,8 @@ public:
     MinVarInfo *MinBlocksInfo(const VariableBase &, const size_t Step) const;
     bool VarShape(const VariableBase &Var, const size_t Step, Dims &Shape) const;
     bool VariableMinMax(const VariableBase &, const size_t Step, MinMaxStruct &MinMax);
+    std::string VariableExprStr(const VariableBase &Var);
+    void SetFlattenMode(bool flatten) { m_FlattenSteps = flatten; };
 
 private:
     format::BP5Deserializer *m_BP5Deserializer = nullptr;
@@ -97,7 +98,8 @@ private:
 
     /* transport manager for managing the active flag file */
     transportman::TransportMan m_ActiveFlagFileManager;
-    Remote m_Remote;
+    bool m_dataIsRemote = false;
+    std::unique_ptr<Remote> m_Remote;
     bool m_WriterIsActive = true;
     adios2::profiling::JSONProfiler m_JSONProfiler;
     #ifdef ADIOS2_HAVE_KVCACHE
@@ -118,6 +120,8 @@ private:
     std::vector<std::pair<uint64_t, uint64_t>> m_FilteredMetadataInfo;
 
     Minifooter m_Minifooter;
+
+    bool m_InitialWriterActiveCheckDone = false;
 
     void Init();
     void InitParameters();
@@ -226,10 +230,11 @@ private:
     uint32_t m_WriterColumnMajor = 0;
     bool m_ReaderIsRowMajor = true;
     bool m_WriterIsRowMajor = true;
+    bool m_FlattenSteps = false; // set to true of writer requested all steps be flattened into 1
 
     format::BufferSTL m_MetadataIndex;
     format::BufferSTL m_MetaMetadata;
-    format::BufferSTL m_Metadata;
+    format::BufferMalloc m_Metadata;
 
     void InstallMetaMetaData(format::BufferSTL MetaMetadata);
     void InstallMetadataForTimestep(size_t Step);

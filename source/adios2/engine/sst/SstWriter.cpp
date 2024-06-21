@@ -226,7 +226,7 @@ void SstWriter::MarshalAttributes()
         void *data_addr = &attribute.m_DataSingleValue;                                            \
         if (!attribute.m_IsSingleValue)                                                            \
         {                                                                                          \
-            element_count = attribute.m_Elements;                                                  \
+            element_count = (int)attribute.m_Elements;                                             \
             data_addr = attribute.m_DataArray.data();                                              \
         }                                                                                          \
         if (Params.MarshalMethod == SstMarshalFFS)                                                 \
@@ -293,6 +293,7 @@ void SstWriter::EndStep()
             //  Free data and metadata blocks here.  BlockToFree is the newblock
             //  value in the enclosing function.
             free(BlockToFree->MetaMetaBlocks);
+            delete BlockToFree->TSInfo->DataBuffer;
             delete BlockToFree->TSInfo;
             delete BlockToFree;
         };
@@ -388,7 +389,7 @@ void SstWriter::Init()
 {
     SstParamParser Parser;
 
-    Parser.ParseParams(m_IO, Params);
+    Parser.ParseParams(m_IO, Params, m_UserOptions);
 
     if (Params.verbose < 0 || Params.verbose > 5)
     {

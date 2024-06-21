@@ -17,6 +17,7 @@
 #include "adios2/core/Info.h"
 
 #include <map>
+#include <string>
 
 namespace adios2
 {
@@ -60,7 +61,7 @@ void parseDimSpec(const std::string &str, int64_t *dims);
 int parseAccuracy();
 int compile_regexp_masks(void);
 void printSettings(void);
-int doList(const char *path);
+int doList(std::string path);
 void mergeLists(int nV, char **listV, int nA, char **listA, char **mlist, bool *isVar);
 
 template <class T>
@@ -87,7 +88,8 @@ bool matchesAMask(const char *name);
 int print_start(const std::string &fnamestr);
 void print_slice_info(core::VariableBase *variable, bool timed, uint64_t *s, uint64_t *c,
                       Dims count);
-int print_data(const void *data, int item, DataType adiosvartypes, bool allowformat);
+int print_data(const void *data, int item, DataType adiosvartypes, bool allowformat,
+               bool char_star_string = false);
 
 /* s is a character array not necessarily null terminated.
  * return false on OK print, true if it not XML (not printed)*/

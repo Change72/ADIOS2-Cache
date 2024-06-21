@@ -14,7 +14,7 @@ endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/ADIOSFunctions.cmake)
 
-setup_version(2.9.0)
+setup_version(2.10.0)
 
 project(ADIOS2 VERSION ${ADIOS2_VERSION})
 
@@ -67,6 +67,7 @@ if(MSVC)
     -D_CRT_SECURE_NO_DEPRECATE
     -D_CRT_SECURE_NO_WARNINGS
     -D_SCL_SECURE_NO_DEPRECATE
+    -D_WINSOCK_DEPRECATED_NO_WARNINGS
     -D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING
   )
 endif()
@@ -183,10 +184,16 @@ adios_option(Profiling  "Enable support for profiling" AUTO)
 adios_option(Endian_Reverse "Enable support for Little/Big Endian Interoperability" AUTO)
 adios_option(Sodium     "Enable support for Sodium for encryption" AUTO)
 adios_option(Catalyst   "Enable support for in situ visualization plugin using ParaView Catalyst" AUTO)
-adios_option(Campaign   "Enable support for Campaigns (requires SQLite3 and ZLIB)" OFF)
+adios_option(Campaign   "Enable support for Campaigns (requires SQLite3 and ZLIB)" AUTO)
 adios_option(AWSSDK     "Enable support for S3 compatible storage using AWS SDK's S3 module" OFF)
 adios_option(Derived_Variable    "Enable support for derived variables" OFF)
 adios_option(PIP        "Enable support for pip packaging" OFF)
+adios_option(XRootD     "Enable support for XRootD" AUTO)
+
+option(ADIOS2_LIBADIOS_MODE "Install only C/C++ library components" OFF)
+mark_as_advanced(ADIOS2_LIBADIOS_MODE)
+option(ADIOS2_Blosc2_PREFER_SHARED "Prefer shared Blosc2 libraries" ON)
+mark_as_advanced(ADIOS2_Blosc2_PREFER_SHARED)
 mark_as_advanced(ADIOS2_USE_PIP)
 include(${PROJECT_SOURCE_DIR}/cmake/DetectOptions.cmake)
 
@@ -216,9 +223,6 @@ if(ADIOS2_HAVE_MPI)
   # Workaround for MPI forcing the link of C++ bindings
   add_definitions(-DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
 endif()
-
-cmake_dependent_option(ADIOS2_Blosc2_PREFER_SHARED "Prefer shared Blosc2 libraries"
-  ON "Blosc2_shlib_available" OFF)
 
 #------------------------------------------------------------------------------#
 # POSIX O_DIRECT is only working for Unix in adios for now
@@ -260,7 +264,7 @@ endif()
 set(ADIOS2_CONFIG_OPTS
     DataMan DataSpaces HDF5 HDF5_VOL MHS SST Fortran MPI Python PIP Blosc2 BZip2
     LIBPRESSIO MGARD MGARD_MDR PNG SZ ZFP DAOS IME O_DIRECT Sodium Catalyst SysVShMem UCX
-    ZeroMQ Profiling Endian_Reverse Derived_Variable AWSSDK GPU_Support CUDA Kokkos
+    ZeroMQ Profiling Endian_Reverse Derived_Variable AWSSDK XRootD GPU_Support CUDA Kokkos
     Kokkos_CUDA Kokkos_HIP Kokkos_SYCL Campaign KVCACHE
 )
 
@@ -314,6 +318,10 @@ if(MSVC AND BUILD_SHARED_LIBS AND ADIOS2_HAVE_HDF5)
   add_definitions(-DH5_BUILT_AS_DYNAMIC_LIB=1)
 endif()
 
+if (ADIOS2_LIBADIOS_MODE)
+  set(ADIOS2_MAYBE_EXCLUDE_FROM_ALL "EXCLUDE_FROM_ALL")
+endif()
+
 #------------------------------------------------------------------------------#
 # Third party libraries
 #------------------------------------------------------------------------------#
@@ -330,6 +338,13 @@ add_subdirectory(source)
 add_subdirectory(bindings)
 
 #------------------------------------------------------------------------------#
+# Language Libraries
+#------------------------------------------------------------------------------#
+if(ADIOS2_HAVE_Python)
+  add_subdirectory(python)
+endif()
+
+#------------------------------------------------------------------------------#
 # Plugins
 #------------------------------------------------------------------------------#
 add_subdirectory(plugins)
@@ -341,6 +356,7 @@ option(ADIOS2_BUILD_EXAMPLES "Build examples" OFF)
 if(ADIOS2_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
+
 
 #------------------------------------------------------------------------------#
 # Testing
@@ -435,9 +451,21 @@ foreach(opt IN LISTS ADIOS2_CONFIG_OPTS)
   endif()
 endforeach()
 
-if (ADIOS2_HAVE_SST AND (ADIOS2_SST_HAVE_LIBFABRIC OR ADIOS2_SST_HAVE_UCX))
-message("    RDMA Transport for Staging: Available")
+set (HPCDataPlaneList "")
+if (ADIOS2_HAVE_SST)
+  if (ADIOS2_SST_HAVE_LIBFABRIC)
+     set (HPCDataPlaneList "${HPCDataPlaneList} fabric")
+  endif()
+  if (ADIOS2_SST_HAVE_UCX)
+     set (HPCDataPlaneList "${HPCDataPlaneList} UCX")
+  endif()
+  if (ADIOS2_SST_HAVE_MPI_DP)
+     set (HPCDataPlaneList "${HPCDataPlaneList} MPI")
+  endif()
+endif()
+if ({HPCDataPlaneList} STREQUAL  "")
+  message("    Possible RDMA DataPlanes for SST: <none>")
 else()
-message("    RDMA Transport for Staging: Unconfigured")
+  message("    Possible RDMA DataPlanes for SST: ${HPCDataPlaneList}")
 endif()
 

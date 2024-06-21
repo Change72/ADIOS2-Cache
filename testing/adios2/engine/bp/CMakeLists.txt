@@ -91,6 +91,8 @@ set(CTEST_TEST_TIMEOUT 10)
 bp_gtest_add_tests_helper(WriteReadADIOS2 MPI_ALLOW)
 async_gtest_add_tests_helper(WriteReadADIOS2 MPI_ALLOW)
 
+gtest_add_tests_helper(WriteReadFlatten MPI_ONLY BP Engine.BP. .BP5 WORKING_DIRECTORY ${BP5_DIR} EXTRA_ARGS "BP5" )
+
 bp_gtest_add_tests_helper(WriteReadADIOS2fstream MPI_ALLOW)
 bp_gtest_add_tests_helper(WriteReadADIOS2stdio MPI_ALLOW)
 bp_gtest_add_tests_helper(WriteReadAsStreamADIOS2 MPI_ALLOW)
@@ -120,10 +122,10 @@ if ((NOT WIN32) AND ADIOS2_HAVE_SST)
       set_tests_properties(Remote.BP${testname}.FileRemote PROPERTIES FIXTURES_REQUIRED Server ENVIRONMENT "DoFileRemote=1")
    endmacro()
 
-   add_test(NAME remoteServerSetup   COMMAND remote_server -background)
+   add_test(NAME remoteServerSetup   COMMAND adios2_remote_server -background)
    set_tests_properties(remoteServerSetup         PROPERTIES FIXTURES_SETUP    Server)
 
-   add_test(NAME remoteServerCleanup COMMAND remote_server -kill_server)
+   add_test(NAME remoteServerCleanup COMMAND adios2_remote_server -kill_server)
    set_tests_properties(remoteServerCleanup         PROPERTIES FIXTURES_CLEANUP    Server)
 
    ##### add remote tests below this line

@@ -62,6 +62,9 @@ Variable<T> &IO::DefineVariable(const std::string &name, const Dims &shape, cons
         }
     }
 
+#if defined(ADIOS2_HAVE_KOKKOS) || defined(ADIOS2_HAVE_GPU_SUPPORT)
+    variable.m_BaseLayout = m_ArrayOrder;
+#endif
     return variable;
 }
 
@@ -284,9 +287,12 @@ Params IO::GetVariableInfo(const std::string &variableName, const std::set<std::
 
     if (keys.empty() || (keysLC.count("min") == 1 && keysLC.count("max") == 1))
     {
-        const auto pairMinMax = variable.MinMax();
-        info["Min"] = helper::ValueToString(pairMinMax.first);
-        info["Max"] = helper::ValueToString(pairMinMax.second);
+        if (TypeHasMinMax(helper::GetDataType<T>()))
+        {
+            const auto pairMinMax = variable.MinMax();
+            info["Min"] = helper::ValueToString(pairMinMax.first);
+            info["Max"] = helper::ValueToString(pairMinMax.second);
+        }
     }
     else if (keysLC.count("min") == 1)
     {

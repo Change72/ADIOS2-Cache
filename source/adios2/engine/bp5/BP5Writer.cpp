@@ -59,7 +59,7 @@ StepStatus BP5Writer::BeginStep(StepMode mode, const float timeoutSeconds)
     // std::cout << "BEGIN STEP starts at: " << ts.count() << std::endl;
     m_BetweenStepPairs = true;
 
-    if (m_WriterStep > 0)
+    if (!m_IsFirstStep)
     {
         m_LastTimeBetweenSteps = Now() - m_EndStepEnd;
         m_TotalTimeBetweenSteps += m_LastTimeBetweenSteps;
@@ -71,7 +71,7 @@ StepStatus BP5Writer::BeginStep(StepMode mode, const float timeoutSeconds)
         }
     }
 
-    if ((m_WriterStep == 0) && m_Parameters.UseOneTimeAttributes)
+    if (m_IsFirstStep && m_Parameters.UseOneTimeAttributes)
     {
         const auto &attributes = m_IO.GetAttributes();
 
@@ -79,7 +79,11 @@ StepStatus BP5Writer::BeginStep(StepMode mode, const float timeoutSeconds)
         {
             m_BP5Serializer.OnetimeMarshalAttribute(*(attributePair.second));
         }
+        m_MarshalAttributesNecessary = false;
     }
+
+    // one-time stuff after Open must be done above
+    m_IsFirstStep = false;
 
     if (m_Parameters.AsyncWrite)
     {
@@ -427,7 +431,7 @@ void BP5Writer::NotifyEngineAttribute(std::string name, AttributeBase *Attr, voi
 
 void BP5Writer::MarshalAttributes()
 {
-    PERFSTUBS_SCOPED_TIMER_FUNC();
+    PERFSTUBS_SCOPED_TIMER("BP5Writer::MarshalAttributes");
     const auto &attributes = m_IO.GetAttributes();
 
     // if there are no new attributes, nothing to do
@@ -474,6 +478,11 @@ void BP5Writer::MarshalAttributes()
 
             m_BP5Serializer.MarshalAttribute(name.c_str(), type, sizeof(char *), element_count,
                                              data_addr);
+            if (!attribute.m_IsSingleValue)
+            {
+                // array of strings
+                free(data_addr);
+            }
         }
 #define declare_type(T)                                                                            \
     else if (type == helper::GetDataType<T>())                                                     \
@@ -498,16 +507,18 @@ void BP5Writer::MarshalAttributes()
 #ifdef ADIOS2_HAVE_DERIVED_VARIABLE
 void BP5Writer::ComputeDerivedVariables()
 {
+    PERFSTUBS_SCOPED_TIMER("BP5Writer::ComputeDerivedVariables");
     auto const &m_VariablesDerived = m_IO.GetDerivedVariables();
     auto const &m_Variables = m_IO.GetVariables();
     // parse all derived variables
+    m_Profiler.Start("DeriveVars");
     for (auto it = m_VariablesDerived.begin(); it != m_VariablesDerived.end(); it++)
     {
         // identify the variables used in the derived variable
         auto derivedVar = dynamic_cast<core::VariableDerived *>((*it).second.get());
         std::vector<std::string> varList = derivedVar->VariableNameList();
         // to create a mapping between variable name and the varInfo (dim and data pointer)
-        std::map<std::string, MinVarInfo> nameToVarInfo;
+        std::map<std::string, std::unique_ptr<MinVarInfo>> nameToVarInfo;
         bool computeDerived = true;
         for (auto varName : varList)
         {
@@ -527,7 +538,7 @@ void BP5Writer::ComputeDerivedVariables()
                 std::cout << " .. skip derived variable " << (*it).second->m_Name << std::endl;
                 break;
             }
-            nameToVarInfo.insert({varName, *mvi});
+            nameToVarInfo.insert({varName, std::unique_ptr<MinVarInfo>(mvi)});
         }
         // skip computing derived variables if it contains variables that are not written this step
         if (!computeDerived)
@@ -553,6 +564,7 @@ void BP5Writer::ComputeDerivedVariables()
             free(std::get<0>(derivedBlock));
         }
     }
+    m_Profiler.Stop("DeriveVars");
 }
 #endif
 
@@ -1209,9 +1221,12 @@ void BP5Writer::MakeHeader(std::vector<char> &buffer, size_t &position, const st
         helper::CopyToBuffer(buffer, position, version.c_str());
     };
 
-    // auto &buffer = b.m_Buffer;
-    // auto &position = b.m_Position;
-    // auto &absolutePosition = b.m_AbsolutePosition;
+    if (sizeof(BP5IndexTableHeader) != 64)
+    {
+        std::cerr << "BP6 Index Table Header must be 64 bytes" << std::endl;
+        exit(1);
+    }
+
     if (position > 0)
     {
         helper::Throw<std::invalid_argument>(
@@ -1227,7 +1242,8 @@ void BP5Writer::MakeHeader(std::vector<char> &buffer, size_t &position, const st
     }
 
     const std::string majorVersion(std::to_string(ADIOS2_VERSION_MAJOR));
-    const std::string minorVersion(std::to_string(ADIOS2_VERSION_MINOR));
+    const char minorVersionChar = '0' + ADIOS2_VERSION_MINOR;
+    const std::string minorVersion(1, minorVersionChar);
     const std::string patchVersion(std::to_string(ADIOS2_VERSION_PATCH));
 
     // byte 0-31: Readable tag
@@ -1263,11 +1279,7 @@ void BP5Writer::MakeHeader(std::vector<char> &buffer, size_t &position, const st
     lf_CopyVersionChar(majorVersion, buffer, position);
     lf_CopyVersionChar(minorVersion, buffer, position);
     lf_CopyVersionChar(patchVersion, buffer, position);
-    ++position;
-
-    // Note: Reader does process and use bytes 36-38 in
-    // BP4Deserialize.cpp::ParseMetadataIndex().
-    // Order and position must match there.
+    position = m_EndianFlagPosition;
 
     // byte 36: endianness
     if (position != m_EndianFlagPosition)
@@ -1317,8 +1329,9 @@ void BP5Writer::MakeHeader(std::vector<char> &buffer, size_t &position, const st
     const uint8_t columnMajor = (m_IO.m_ArrayOrder == ArrayOrdering::ColumnMajor) ? 'y' : 'n';
     helper::CopyToBuffer(buffer, position, &columnMajor);
 
-    // byte 41-63: unused
-    position += 23;
+    helper::CopyToBuffer(buffer, position, &m_Parameters.FlattenSteps);
+    // remainder  unused
+    position = m_IndexHeaderSize;
     // absolutePosition = position;
 }
 
@@ -1719,7 +1732,8 @@ void BP5Writer::PutCommon(VariableBase &variable, const void *values, bool sync)
     }
 
     // if the user buffer is allocated on the GPU always use sync mode
-    if (variable.GetMemorySpace(values) != MemorySpace::Host)
+    auto memSpace = variable.GetMemorySpace(values);
+    if (memSpace != MemorySpace::Host)
         sync = true;
 
     size_t *Shape = NULL;
@@ -1790,8 +1804,7 @@ void BP5Writer::PutCommon(VariableBase &variable, const void *values, bool sync)
         helper::NdCopy((const char *)values, helper::CoreDims(ZeroDims), MemoryCount,
                        sourceRowMajor, false, (char *)ptr, MemoryStart, varCount, sourceRowMajor,
                        false, (int)ObjSize, helper::CoreDims(), helper::CoreDims(),
-                       helper::CoreDims(), helper::CoreDims(), false /* safemode */,
-                       variable.m_MemSpace);
+                       helper::CoreDims(), helper::CoreDims(), false /* safemode */, memSpace);
     }
     else
     {

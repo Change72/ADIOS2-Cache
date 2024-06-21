@@ -26,16 +26,22 @@ struct OperatorFunctions
 
 DerivedData AddFunc(std::vector<DerivedData> input, DataType type);
 DerivedData MagnitudeFunc(std::vector<DerivedData> input, DataType type);
+DerivedData Curl3DFunc(std::vector<DerivedData> input, DataType type);
 
 Dims SameDimsFunc(std::vector<Dims> input);
+Dims CurlDimsFunc(std::vector<Dims> input);
 
 const std::map<adios2::detail::ExpressionOperator, OperatorFunctions> OpFunctions = {
     {adios2::detail::ExpressionOperator::OP_ADD, {AddFunc, SameDimsFunc}},
+    {adios2::detail::ExpressionOperator::OP_CURL, {Curl3DFunc, CurlDimsFunc}},
     {adios2::detail::ExpressionOperator::OP_MAGN, {MagnitudeFunc, SameDimsFunc}}};
 
 template <class T>
 T *ApplyOneToOne(std::vector<DerivedData> inputData, size_t dataSize,
                  std::function<T(T, T)> compFct);
+
+template <class T>
+T *ApplyCurl(const T *input1, const T *input2, const T *input3, const size_t dims[3]);
 
 }
 }

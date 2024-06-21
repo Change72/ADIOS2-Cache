@@ -482,6 +482,8 @@ public:
         return false;
     }
 
+    virtual std::string VariableExprStr(const VariableBase &) { return NULL; }
+
     /** Notify the engine when a new attribute is defined. Called from IO.tcc
      */
     virtual void NotifyEngineAttribute(std::string name, DataType type) noexcept;
@@ -504,6 +506,9 @@ protected:
     /** from ADIOS class passed to Engine created with Open
      *  if no communicator is passed */
     helper::Comm m_Comm;
+
+    /** User options parsed by the ADIOS object, here just for easy reference */
+    const UserOptions &m_UserOptions;
 
     /** keeps track of current advance status */
     StepStatus m_AdvanceStatus = StepStatus::OK;

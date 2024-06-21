@@ -10,6 +10,8 @@
 #include "BP5Reader.tcc"
 
 #include "adios2/helper/adiosMath.h" // SetWithinLimit
+#include "adios2/toolkit/remote/EVPathRemote.h"
+#include "adios2/toolkit/remote/XrootdRemote.h"
 #include "adios2/toolkit/transport/file/FileFStream.h"
 #include <adios2-perfstubs-interface.h>
 
@@ -70,9 +72,9 @@ void BP5Reader::InstallMetadataForTimestep(size_t Step)
     {
         // variable metadata for timestep
         size_t ThisMDSize =
-            helper::ReadValue<uint64_t>(m_Metadata.m_Buffer, Position, m_Minifooter.IsLittleEndian);
-        char *ThisMD = m_Metadata.m_Buffer.data() + MDPosition;
-        if (m_OpenMode == Mode::ReadRandomAccess)
+            helper::ReadValue<uint64_t>(m_Metadata.Data(), Position, m_Minifooter.IsLittleEndian);
+        char *ThisMD = m_Metadata.Data() + MDPosition;
+        if ((m_OpenMode == Mode::ReadRandomAccess) || (m_FlattenSteps))
         {
             m_BP5Deserializer->InstallMetaData(ThisMD, ThisMDSize, WriterRank, Step);
         }
@@ -86,8 +88,8 @@ void BP5Reader::InstallMetadataForTimestep(size_t Step)
     {
         // attribute metadata for timestep
         size_t ThisADSize =
-            helper::ReadValue<uint64_t>(m_Metadata.m_Buffer, Position, m_Minifooter.IsLittleEndian);
-        char *ThisAD = m_Metadata.m_Buffer.data() + MDPosition;
+            helper::ReadValue<uint64_t>(m_Metadata.Data(), Position, m_Minifooter.IsLittleEndian);
+        char *ThisAD = m_Metadata.Data() + MDPosition;
         if (ThisADSize > 0)
             m_BP5Deserializer->InstallAttributeData(ThisAD, ThisADSize);
         MDPosition += ThisADSize;
@@ -98,7 +100,7 @@ StepStatus BP5Reader::BeginStep(StepMode mode, const float timeoutSeconds)
 {
     PERFSTUBS_SCOPED_TIMER("BP5Reader::BeginStep");
 
-    if (m_OpenMode == Mode::ReadRandomAccess)
+    if (m_OpenMode != Mode::Read)
     {
         helper::Throw<std::logic_error>("Engine", "BP5Reader", "BeginStep",
                                         "BeginStep called in random access mode");
@@ -184,7 +186,7 @@ size_t BP5Reader::CurrentStep() const { return m_CurrentStep; }
 
 void BP5Reader::EndStep()
 {
-    if (m_OpenMode == Mode::ReadRandomAccess)
+    if (m_OpenMode != Mode::Read)
     {
         helper::Throw<std::logic_error>("Engine", "BP5Reader", "EndStep",
                                         "EndStep called in random access mode");
@@ -225,6 +227,12 @@ std::pair<double, double> BP5Reader::ReadData(adios2::transportman::TransportMan
         }
         FileManager.OpenFileID(subFileName, SubfileNum, Mode::Read, m_IO.m_TransportsParameters[0],
                                /*{{"transport", "File"}},*/ false);
+        if (!m_WriterIsActive)
+        {
+            Params transportParameters;
+            transportParameters["FailOnEOF"] = "true";
+            FileManager.SetParameters(transportParameters, -1);
+        }
     }
     TP endSubfile = NOW();
     double timeSubfile = DURATION(startSubfile, endSubfile);
@@ -266,6 +274,59 @@ std::pair<double, double> BP5Reader::ReadData(adios2::transportman::TransportMan
 
 void BP5Reader::PerformGets()
 {
+    // if dataIsRemote is true and m_Remote is not true, this is our first time through
+    // PerformGets() Either we don't need a remote open (m_dataIsRemote=false), or we need to Open
+    // remote file (or die trying)
+    if (m_dataIsRemote && !m_Remote)
+    {
+        bool RowMajorOrdering = (m_IO.m_ArrayOrder == ArrayOrdering::RowMajor);
+
+        // If nothing is pending, don't open
+        if (m_BP5Deserializer->PendingGetRequests.size() == 0)
+            return;
+
+        std::string RemoteName;
+        if (!m_Parameters.RemoteDataPath.empty())
+        {
+            RemoteName = m_Parameters.RemoteDataPath;
+        }
+        else if (getenv("DoRemote") || getenv("DoXRootD"))
+        {
+            RemoteName = m_Name;
+        }
+        (void)RowMajorOrdering; // Use in case no remotes available
+#ifdef ADIOS2_HAVE_XROOTD
+        if (getenv("DoXRootD"))
+        {
+            m_Remote = std::unique_ptr<XrootdRemote>(new XrootdRemote());
+            m_Remote->Open("localhost", 1094, m_Name, m_OpenMode, RowMajorOrdering);
+        }
+        else
+#endif
+#ifdef ADIOS2_HAVE_SST
+            if (getenv("DoRemote"))
+        {
+            m_Remote = std::unique_ptr<EVPathRemote>(new EVPathRemote());
+            m_Remote->Open("localhost", EVPathRemoteCommon::ServerPort, RemoteName, m_OpenMode,
+                           RowMajorOrdering);
+        }
+#endif
+        if (m_Remote == nullptr)
+        {
+            helper::Throw<std::ios_base::failure>(
+                "Engine", "BP5Reader", "OpenFiles",
+                "Remote file " + m_Name +
+                    " cannot be opened. Possible server or file specification error.");
+        }
+        if (!m_Remote)
+        {
+            helper::Throw<std::ios_base::failure>(
+                "Engine", "BP5Reader", "OpenFiles",
+                "Remote file " + m_Name +
+                    " cannot be opened. Possible server or file specification error.");
+        }
+    }
+
     if (m_Remote)
     {
         PerformRemoteGets();
@@ -286,6 +347,7 @@ void BP5Reader::PerformRemoteGets()
 {
     // TP startGenerate = NOW();
     auto GetRequests = m_BP5Deserializer->PendingGetRequests;
+    std::vector<Remote::GetHandle> handles;
     #ifdef ADIOS2_HAVE_KVCACHE // open kv cache connection
     if (getenv("useKVCache")) 
     {
@@ -397,7 +459,13 @@ ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
             }
         }
         #endif
-        m_Remote.Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
+        auto handle =
+            m_Remote->Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
+        handles.push_back(handle);
+    }
+    for (auto &handle : handles)
+    {
+        m_Remote->WaitForGet(handle);
 
         #ifdef ADIOS2_HAVE_KVCACHE // set data to cache
         if (getenv("useKVCache"))
@@ -427,12 +495,18 @@ ADIOS2_FOREACH_PRIMITIVE_STDTYPE_1ARG(declare_type_full_contain)
 
 void BP5Reader::PerformLocalGets()
 {
-    auto lf_CompareReqSubfile = [&](adios2::format::BP5Deserializer::ReadRequest &r1,
-                                    adios2::format::BP5Deserializer::ReadRequest &r2) -> bool {
+    auto lf_CompareReqSubfile =
+        [&](const adios2::format::BP5Deserializer::ReadRequest &r1,
+            const adios2::format::BP5Deserializer::ReadRequest &r2) -> bool {
         return (m_WriterMap[m_WriterMapIndex[r1.Timestep]].RankToSubfile[r1.WriterRank] <
                 m_WriterMap[m_WriterMapIndex[r2.Timestep]].RankToSubfile[r2.WriterRank]);
     };
 
+    if (!m_InitialWriterActiveCheckDone)
+    {
+        CheckWriterActive();
+        m_InitialWriterActiveCheckDone = true;
+    }
     // TP start = NOW();
     PERFSTUBS_SCOPED_TIMER("BP5Reader::PerformGets");
     m_JSONProfiler.Start("DataRead");
@@ -598,18 +672,11 @@ void BP5Reader::Init()
     OpenFiles(timeoutInstant, pollSeconds, timeoutSeconds);
     UpdateBuffer(timeoutInstant, pollSeconds / 10, timeoutSeconds);
 
-    //  This isn't how we'll trigger remote ops in the end, but a temporary
-    //  solution
-    bool RowMajorOrdering = (m_IO.m_ArrayOrder == ArrayOrdering::RowMajor);
+    // Don't try to open the remote file when we open local metadata.  Do that on demand.
     if (!m_Parameters.RemoteDataPath.empty())
-    {
-        m_Remote.Open("localhost", RemoteCommon::ServerPort, m_Parameters.RemoteDataPath,
-                      m_OpenMode, RowMajorOrdering);
-    }
-    else if (getenv("DoRemote"))
-    {
-        m_Remote.Open("localhost", RemoteCommon::ServerPort, m_Name, m_OpenMode, RowMajorOrdering);
-    }
+        m_dataIsRemote = true;
+    if (getenv("DoRemote") || getenv("DoXRootD"))
+        m_dataIsRemote = true;
 }
 
 void BP5Reader::InitParameters()
@@ -824,6 +891,20 @@ bool BP5Reader::VariableMinMax(const VariableBase &Var, const size_t Step, MinMa
     return m_BP5Deserializer->VariableMinMax(Var, Step, MinMax);
 }
 
+std::string BP5Reader::VariableExprStr(const VariableBase &Var)
+{
+#ifdef ADIOS2_HAVE_DERIVED_VARIABLE
+    char *expPtr = m_BP5Deserializer->VariableExprStr(Var);
+    if (expPtr != nullptr)
+    {
+        derived::Expression expr(expPtr);
+        return expr.toStringExpr();
+    }
+#endif
+    std::string noDerive("");
+    return noDerive;
+}
+
 void BP5Reader::InitTransports()
 {
     if (m_IO.m_TransportsParameters.empty())
@@ -900,8 +981,9 @@ void BP5Reader::UpdateBuffer(const TimePoint &timeoutInstant, const Seconds &pol
         // create the serializer object
         if (!m_BP5Deserializer)
         {
-            m_BP5Deserializer = new format::BP5Deserializer(m_WriterIsRowMajor, m_ReaderIsRowMajor,
-                                                            (m_OpenMode == Mode::ReadRandomAccess));
+            m_BP5Deserializer =
+                new format::BP5Deserializer(m_WriterIsRowMajor, m_ReaderIsRowMajor,
+                                            (m_OpenMode != Mode::Read), (m_FlattenSteps));
             m_BP5Deserializer->m_Engine = this;
         }
     }
@@ -942,8 +1024,7 @@ void BP5Reader::UpdateBuffer(const TimePoint &timeoutInstant, const Seconds &pol
                 for (auto p : m_FilteredMetadataInfo)
                 {
                     m_JSONProfiler.AddBytes("metadataread", p.second);
-                    m_MDFileManager.ReadFile(m_Metadata.m_Buffer.data() + mempos, p.second,
-                                             p.first);
+                    m_MDFileManager.ReadFile(m_Metadata.Data() + mempos, p.second, p.first);
                     mempos += p.second;
                 }
                 m_MDFileAlreadyReadSize = expectedMinFileSize;
@@ -985,15 +1066,21 @@ void BP5Reader::UpdateBuffer(const TimePoint &timeoutInstant, const Seconds &pol
             }
         }
 
-        // broadcast buffer to all ranks from zero
-        m_Comm.BroadcastVector(m_Metadata.m_Buffer);
-
         // broadcast metadata index buffer to all ranks from zero
         m_Comm.BroadcastVector(m_MetaMetadata.m_Buffer);
 
         InstallMetaMetaData(m_MetaMetadata);
 
-        if (m_OpenMode == Mode::ReadRandomAccess)
+        size_t inputSize = m_Comm.BroadcastValue(m_Metadata.Size(), 0);
+
+        if (m_Comm.Rank() != 0)
+        {
+            m_Metadata.Resize(inputSize, "metadata broadcast");
+        }
+
+        m_Comm.Bcast(m_Metadata.Data(), inputSize, 0);
+
+        if ((m_OpenMode == Mode::ReadRandomAccess) || m_FlattenSteps)
         {
             for (size_t Step = 0; Step < m_MetadataIndexTable.size(); Step++)
             {
@@ -1070,6 +1157,15 @@ size_t BP5Reader::ParseMetadataIndex(format::BufferSTL &bufferSTL, const size_t 
         const uint8_t val =
             helper::ReadValue<uint8_t>(buffer, position, m_Minifooter.IsLittleEndian);
         m_WriterIsRowMajor = val == 'n';
+
+        position = m_FlattenStepsPosition;
+        const uint8_t flatten_val =
+            helper::ReadValue<uint8_t>(buffer, position, m_Minifooter.IsLittleEndian);
+        m_FlattenSteps = (flatten_val != 0);
+
+        if (m_Parameters.IgnoreFlattenSteps)
+            m_FlattenSteps = false;
+
         // move position to first row
         position = m_IndexHeaderSize;
     }
@@ -1399,7 +1495,13 @@ void BP5Reader::FlushProfiler()
     }
 }
 
-size_t BP5Reader::DoSteps() const { return m_StepsCount; }
+size_t BP5Reader::DoSteps() const
+{
+    if (m_FlattenSteps)
+        return 1;
+    else
+        return m_StepsCount;
+}
 
 void BP5Reader::NotifyEngineNoVarsQuery()
 {

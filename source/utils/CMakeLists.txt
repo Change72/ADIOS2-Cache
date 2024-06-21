@@ -13,22 +13,17 @@ configure_file(
 add_executable(bpls ./bpls/bpls.cpp)
 target_link_libraries(bpls
                       PUBLIC adios2_core adios2sys
-                      PRIVATE $<$<PLATFORM_ID:Windows>:shlwapi>)
-
-get_property(pugixml_headers_path
-  TARGET pugixml
-  PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-)
+                      PRIVATE adios2::thirdparty::pugixml $<$<PLATFORM_ID:Windows>:shlwapi>)
 
 target_include_directories(bpls PRIVATE
   ${PROJECT_BINARY_DIR}
   ${PROJECT_SOURCE_DIR}/bindings/C
-  ${pugixml_headers_path}
 )
 
 set_property(TARGET bpls PROPERTY OUTPUT_NAME bpls${ADIOS2_EXECUTABLE_SUFFIX})
 install(TARGETS bpls EXPORT adios2
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT adios2_tools-runtime
+  ${ADIOS2_MAYBE_EXCLUDE_FROM_ALL}
 )
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/bpls/bpls.cmake.gen.in
@@ -76,6 +71,7 @@ install(TARGETS adios_reorganize
   ${maybe_adios_reorganize_mpi}
   EXPORT adios2
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT adios2_tools-runtime
+  ${ADIOS2_MAYBE_EXCLUDE_FROM_ALL}
 )
 
 if(ADIOS2_HAVE_MPI)
@@ -89,13 +85,17 @@ if(Python_Interpreter_FOUND)
   install(PROGRAMS adios2_json_pp.py
     RENAME adios2_json_pp
     DESTINATION ${CMAKE_INSTALL_BINDIR}
-    COMPONENT adios2_scripts-runtime)
+    COMPONENT adios2_scripts-runtime
+    ${ADIOS2_MAYBE_EXCLUDE_FROM_ALL}
+  )
 endif()
 
 install(PROGRAMS adios2_deactivate_bp
   RENAME adios2_deactivate_bp
   DESTINATION ${CMAKE_INSTALL_BINDIR}
-  COMPONENT adios2_scripts-runtime)
+  COMPONENT adios2_scripts-runtime
+  ${ADIOS2_MAYBE_EXCLUDE_FROM_ALL}
+)
 
 # Simplified wrappers for adios2_reorganize
 configure_file(
@@ -116,3 +116,6 @@ if(ADIOS2_HAVE_HDF5)
     )
   endif()
 endif()
+if (ADIOS2_HAVE_XRootD)
+  add_subdirectory(xrootd-plugin)
+endif ()

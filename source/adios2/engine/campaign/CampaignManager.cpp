@@ -17,6 +17,7 @@
 #include <iostream>
 
 #include <nlohmann_json.hpp>
+#include <sqlite3.h>
 
 namespace adios2
 {
@@ -25,56 +26,84 @@ namespace core
 namespace engine
 {
 
-static std::string CMapToJson(const CampaignRecordMap &cmap, const int rank, const std::string name)
+int CMapToSqlite(const CampaignRecordMap &cmap, const int rank, std::string name)
 {
-    nlohmann::json j = nlohmann::json::array();
+    sqlite3 *db;
+    int rc;
+    char *zErrMsg = nullptr;
+    std::string sqlcmd;
+    std::string db_name = name + ".db";
+    rc = sqlite3_open(db_name.c_str(), &db);
+
+    if (rc != SQLITE_OK)
+    {
+        std::cout << "SQL error: " << zErrMsg << std::endl;
+        std::string m(zErrMsg);
+        helper::Throw<std::invalid_argument>("Engine", "CampaignReader", "WriteCampaignData",
+                                             "SQL error on writing records:");
+        sqlite3_free(zErrMsg);
+    }
+    sqlcmd = "CREATE TABLE if not exists bpfiles (name PRIMARY KEY);";
+    rc = sqlite3_exec(db, sqlcmd.c_str(), 0, 0, &zErrMsg);
+    if (rc != SQLITE_OK)
+    {
+        std::cout << "SQL error: " << zErrMsg << std::endl;
+        std::string m(zErrMsg);
+        helper::Throw<std::invalid_argument>("Engine", "CampaignReader", "WriteCampaignData",
+                                             "SQL error on writing records:");
+        sqlite3_free(zErrMsg);
+    }
+
     for (auto &r : cmap)
     {
-        nlohmann::json c = nlohmann::json{{"name", r.first},
-                                          {"varying_deltas", r.second.varying_deltas},
-                                          {"delta_step", r.second.delta_step},
-                                          {"delta_time", r.second.delta_time},
-                                          {"steps", r.second.steps},
-                                          {"times", r.second.times}};
-        j.push_back(c);
+        sqlcmd = "INSERT OR IGNORE INTO bpfiles (name)\n";
+        sqlcmd += "VALUES('" + r.first + "');";
+        rc = sqlite3_exec(db, sqlcmd.c_str(), 0, 0, &zErrMsg);
+        if (rc != SQLITE_OK)
+        {
+            std::cout << "SQL error: " << zErrMsg << std::endl;
+            std::string m(zErrMsg);
+            helper::Throw<std::invalid_argument>("Engine", "CampaignReader", "WriteCampaignData",
+                                                 "SQL error on writing records:");
+            sqlite3_free(zErrMsg);
+        }
     }
-    return nlohmann::to_string(j);
+
+    sqlite3_close(db);
+
+    return 0;
 }
 
-CampaignManager::CampaignManager(adios2::helper::Comm &comm)
-{
-    m_WriterRank = comm.Rank();
-    if (m_Verbosity == 5)
-    {
-        std::cout << "Campaign Manager " << m_WriterRank << " constructor called" << std::endl;
-    }
-    helper::CreateDirectory(m_CampaignDir);
-}
+CampaignManager::CampaignManager(adios2::helper::Comm &comm) { m_WriterRank = comm.Rank(); }
 
 CampaignManager::~CampaignManager()
 {
-    if (m_Verbosity == 5)
-    {
-        std::cout << "Campaign Manager " << m_WriterRank << " desctructor called\n";
-    }
     if (m_Opened)
     {
         Close();
     }
 }
 
-void CampaignManager::Open(const std::string &name)
+void CampaignManager::Open(const std::string &name, const UserOptions &options)
 {
-    m_Name = m_CampaignDir + "/" + name + "_" + std::to_string(m_WriterRank) + ".json";
-    if (m_Verbosity == 5)
+    const UserOptions::Campaign &opts = options.campaign;
+    m_Options.active = opts.active;
+    m_Options.hostname = opts.hostname;
+    m_Options.campaignstorepath = opts.campaignstorepath;
+    m_Options.cachepath = opts.cachepath;
+    m_Options.verbose = opts.verbose;
+
+    m_Name = m_CampaignDir + PathSeparator + name + "_" + std::to_string(m_WriterRank);
+    if (m_Options.verbose > 0)
     {
         std::cout << "Campaign Manager " << m_WriterRank << " Open(" << m_Name << ")\n";
     }
+    m_Opened = true;
 }
 
 void CampaignManager::Record(const std::string &name, const size_t step, const double time)
 {
-    if (m_Verbosity == 5)
+    if (m_Options.verbose > 0)
     {
         std::cout << "Campaign Manager " << m_WriterRank << "   Record name = " << name
                   << " step = " << step << " time = " << time << "\n";
@@ -118,12 +147,10 @@ void CampaignManager::Close()
 {
     if (!cmap.empty())
     {
-        m_Output.open(m_Name, std::ofstream::out);
-        m_Opened = true;
-        m_Output << std::setw(4) << CMapToJson(cmap, m_WriterRank, m_Name) << std::endl;
-        m_Output.close();
-        m_Opened = false;
+        helper::CreateDirectory(m_CampaignDir);
+        CMapToSqlite(cmap, m_WriterRank, m_Name);
     }
+    m_Opened = false;
 }
 
 } // end namespace engine

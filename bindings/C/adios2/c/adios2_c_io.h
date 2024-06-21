@@ -122,6 +122,26 @@ adios2_variable *adios2_define_variable(adios2_io *io, const char *name, const a
                                         const size_t *start, const size_t *count,
                                         const adios2_constant_dims constant_dims);
 
+#ifdef ADIOS2_HAVE_DERIVED_VARIABLE
+/**
+ * @brief Define a derived variable within io
+ * @param io handler that owns the variable
+ * @param name unique variable identifier
+ * @param type primitive type from enum adios2_type in adios2_c_types.h
+ * @param ndims number of dimensions
+ * @param shape global dimension
+ * @param start local offset
+ * @param count local dimension
+ * @param constant_dims adios2_constant_dims_true:: shape, start, count
+ * won't change; adios2_constant_dims_false: shape, start, count will change
+ * after definition
+ * @return success: handler, failure: NULL
+ */
+adios2_derived_variable *adios2_define_derived_variable(adios2_io *io, const char *name,
+                                                        const char *expression,
+                                                        const adios2_derived_var_type type);
+#endif
+
 /**
  * @brief Retrieve a variable handler within current io handler
  * @param io handler to variable io owner
@@ -309,8 +329,8 @@ adios2_error adios2_remove_all_attributes(adios2_io *io);
  * MPI Collective function as it calls MPI_Comm_dup
  * @param io engine owner
  * @param name unique engine identifier
- * @param mode adios2_mode_write, adios2_mode_read, adios2_mode_append, and
- * adios2_mode_readRandomAccess
+ * @param mode adios2_mode_write, adios2_mode_read, adios2_mode_append
+ * and adios2_mode_readRandomAccess
  * @return success: handler, failure: NULL
  */
 adios2_engine *adios2_open(adios2_io *io, const char *name, const adios2_mode mode);
@@ -321,7 +341,7 @@ adios2_engine *adios2_open(adios2_io *io, const char *name, const adios2_mode mo
  * MPI Collective function as it calls MPI_Comm_dup
  * @param io engine owner
  * @param name unique engine identifier
- * @param mode adios2_mode_write, adios2_mode_read, adios2_mode_append, and
+ * @param mode adios2_mode_write, adios2_mode_read, adios2_mode_append and
  * adios2_mode_readRandomAccess
  * @param comm communicator other than adios' handler comm. MPI only.
  * @return success: handler, failure: NULL

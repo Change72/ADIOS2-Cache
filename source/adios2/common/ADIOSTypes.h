@@ -45,10 +45,8 @@ enum class DerivedVarType
 /** Memory space for the user provided buffers */
 enum class MemorySpace
 {
-#ifdef ADIOS2_HAVE_GPU_SUPPORT
     Detect, ///< Detect the memory space automatically
-#endif
-    Host, ///< Host memory space
+    Host,   ///< Host memory space
 #ifdef ADIOS2_HAVE_GPU_SUPPORT
     GPU ///< GPU memory space
 #endif
@@ -243,11 +241,7 @@ struct MinVarInfo
 void PrintMVI(std::ostream &os, const MinVarInfo &mvi);
 
 // adios defaults
-#ifdef _WIN32
-const std::string DefaultFileLibrary("fstream");
-#else
 const std::string DefaultFileLibrary("POSIX");
-#endif
 const std::string DefaultTimeUnit("Microseconds");
 constexpr TimeUnit DefaultTimeUnitEnum(TimeUnit::Microseconds);
 
@@ -336,6 +330,12 @@ constexpr double Linf_norm = std::numeric_limits<double>::infinity();
 int TypeElementSize(DataType adiosvartype);
 
 /**
+ *  Return true if a type has a reasonable Min/Max (is a simple integer or float type), false
+ * otherwise
+ */
+bool TypeHasMinMax(DataType adiosvartype);
+
+/**
  * ToString
  * makes a string from an enum class like ShapeID etc, for debugging etc
  * It is also overloaded elsewhere to allow for a readable representation of
@@ -355,6 +355,34 @@ std::string ToString(SelectionType value);
 std::string ToString(DataType type);
 std::string ToString(const Dims &dims);
 std::string ToString(const Box<Dims> &box);
+std::string ToString(const MemorySpace value);
+
+/** UserOptions holds all user options from ~/.config/adios2/adios2.yaml */
+struct UserOptions
+{
+    struct General
+    {
+        int verbose;
+    };
+
+    struct Campaign
+    {
+        bool active;
+        int verbose;
+        std::string hostname;
+        std::string campaignstorepath;
+        std::string cachepath;
+    };
+
+    struct SST
+    {
+        int verbose;
+    };
+
+    General general;
+    Campaign campaign;
+    SST sst;
+};
 
 /**
  * os << [adios2_type] enables output of adios2 enums/classes directly

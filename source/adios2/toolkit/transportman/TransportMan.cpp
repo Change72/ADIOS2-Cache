@@ -4,8 +4,6 @@
  *
  * TransportMan.cpp
  *
- *  Created on: May 23, 2017
- *      Author: William F Godoy godoywf@ornl.gov
  */
 
 #include "TransportMan.h"
@@ -17,9 +15,7 @@
 #include "adios2/helper/adiosFunctions.h" //CreateDirectory
 
 /// transports
-#ifndef _WIN32
 #include "adios2/toolkit/transport/file/FilePOSIX.h"
-#endif
 #ifdef ADIOS2_HAVE_DAOS
 #include "adios2/toolkit/transport/file/FileDaos.h"
 #endif
@@ -86,6 +82,9 @@ void TransportMan::MkDirsBarrier(const std::vector<std::string> &fileNames,
                 }
                 else
                 {
+#ifdef CreateDirectory
+#undef CreateDirectory
+#endif
                     helper::CreateDirectory(path);
                 }
             }
@@ -410,6 +409,26 @@ void TransportMan::ReadFile(char *buffer, const size_t size, const size_t start,
     itTransport->second->Read(buffer, size, start);
 }
 
+void TransportMan::SetParameters(const Params &params, const int transportIndex)
+{
+    if (transportIndex == -1)
+    {
+        for (auto &transportPair : m_Transports)
+        {
+            auto &transport = transportPair.second;
+
+            transport->SetParameters(params);
+        }
+    }
+    else
+    {
+        auto itTransport = m_Transports.find(transportIndex);
+        CheckFile(itTransport,
+                  ", in call to SetParameters with index " + std::to_string(transportIndex));
+        itTransport->second->SetParameters(params);
+    }
+}
+
 void TransportMan::FlushFiles(const int transportIndex)
 {
     if (transportIndex == -1)
@@ -556,7 +575,6 @@ std::shared_ptr<Transport> TransportMan::OpenFileTransport(const std::string &fi
                 transport->SetBuffer(nullptr, 0);
             }
         }
-#ifndef _WIN32
         else if (library == "posix")
         {
             transport = std::make_shared<transport::FilePOSIX>(m_Comm);
@@ -567,7 +585,6 @@ std::shared_ptr<Transport> TransportMan::OpenFileTransport(const std::string &fi
                     library + " transport does not support buffered I/O.");
             }
         }
-#endif
 #ifdef ADIOS2_HAVE_DAOS
         else if (library == "daos")
         {

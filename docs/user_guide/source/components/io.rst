@@ -185,7 +185,11 @@ If the inquired variable/attribute is not found, then the overloaded ``bool()`` 
 
 .. caution::
 
-   Since ``InquireVariable`` and ``InquireAttribute`` are template functions, both the name and type must match the data you are looking for.
+   Since ``InquireVariable`` and ``InquireAttribute`` are template
+   functions, both the name and type must match the data you are
+   looking for.  If you do not know the type of the variable you are
+   inquiring about, it can be accessed with the
+   ``InquireVariableType`` function.
 
 
 Opening an Engine
@@ -196,7 +200,7 @@ A particular ``Engine`` type is set to the current ``IO`` component with the ``I
 Engine polymorphism is handled internally by the ``IO`` class, which allows subclassing future derived ``Engine`` types without changing the basic API.
 
 ``Engine`` objects are created in various modes.
-The available modes are ``adios2::Mode::Read``, ``adios2::Mode::Write``, ``adios2::Mode::Append``, ``adios2::Mode::Sync``, ``adios2::Mode::Deferred``, and ``adios2::Mode::Undefined``.
+The available modes are ``adios2::Mode::Read``, ``adios2::Mode::ReadRandomAccess``, ``adios2::Mode::Write``, ``adios2::Mode::Append``, ``adios2::Mode::Sync``, ``adios2::Mode::Deferred``, and ``adios2::Mode::Undefined``.
 
 
 .. code-block:: c++

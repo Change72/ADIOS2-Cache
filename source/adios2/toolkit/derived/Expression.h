@@ -34,7 +34,7 @@ public:
     std::vector<std::tuple<ExpressionTree, std::string, bool>> sub_exprs;
     OpInfo detail;
 
-    ExpressionTree(){};
+    ExpressionTree() : detail({adios2::detail::ExpressionOperator::OP_NULL, {}, 0}) {}
     ExpressionTree(adios2::detail::ExpressionOperator o) : detail({o, {}, 0}) {}
     ExpressionTree(adios2::detail::ExpressionOperator o, double c) : detail({o, {}, 0}) {}
     ExpressionTree(std::vector<std::tuple<size_t, size_t, size_t>> indices)
@@ -54,6 +54,7 @@ public:
     ApplyExpression(DataType type, size_t numBlocks,
                     std::map<std::string, std::vector<DerivedData>> nameToData);
     void print();
+    std::string toStringExpr();
 };
 
 class Expression
@@ -73,6 +74,7 @@ public:
     Dims GetShape();
     Dims GetStart();
     Dims GetCount();
+    std::string toStringExpr();
     void SetDims(std::map<std::string, std::tuple<Dims, Dims, Dims>> NameToDims);
     std::vector<std::string> VariableNameList();
     std::vector<DerivedData>

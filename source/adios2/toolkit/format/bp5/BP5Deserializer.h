@@ -35,7 +35,8 @@ class BP5Deserializer : virtual public BP5Base
 {
 
 public:
-    BP5Deserializer(bool WriterIsRowMajor, bool ReaderIsRowMajor, bool RandomAccessMode = false);
+    BP5Deserializer(bool WriterIsRowMajor, bool ReaderIsRowMajor, bool RandomAccessMode = false,
+                    bool FlattenSteps = false);
 
     ~BP5Deserializer();
 
@@ -82,6 +83,7 @@ public:
     MinVarInfo *MinBlocksInfo(const VariableBase &Var, const size_t Step);
     bool VarShape(const VariableBase &, const size_t Step, Dims &Shape) const;
     bool VariableMinMax(const VariableBase &var, const size_t Step, MinMaxStruct &MinMax);
+    char *VariableExprStr(const VariableBase &var);
     void GetAbsoluteSteps(const VariableBase &variable, std::vector<size_t> &keys) const;
 
     const bool m_WriterIsRowMajor;
@@ -173,6 +175,7 @@ private:
     FFSContext ReaderFFSContext;
 
     const bool m_RandomAccessMode;
+    const bool m_FlattenSteps;
 
     std::vector<size_t> m_WriterCohortSize; // per step, in random mode
     size_t m_CurrentWriterCohortSize;       // valid in streaming mode

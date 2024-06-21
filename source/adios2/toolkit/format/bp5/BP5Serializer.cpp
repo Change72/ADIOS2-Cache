@@ -37,14 +37,16 @@ namespace format
 BP5Serializer::BP5Serializer() { Init(); }
 BP5Serializer::~BP5Serializer()
 {
-    if (!Info.RecMap.empty())
+    if (CurDataBuffer)
+        delete CurDataBuffer;
+    if (!Info.RecNameMap.empty())
     {
-        for (auto &rec : Info.RecMap)
+        for (auto &rec : Info.RecNameMap)
         {
             if (rec.second.OperatorType)
                 free(rec.second.OperatorType);
         }
-        Info.RecMap.clear();
+        Info.RecNameMap.clear();
     }
     if (Info.MetaFieldCount)
         free_FMfield_list(Info.MetaFields);
@@ -82,12 +84,13 @@ void BP5Serializer::Init()
     ((BP5MetadataInfoStruct *)MetadataBuf)->BitField = (std::size_t *)malloc(sizeof(size_t));
     ((BP5MetadataInfoStruct *)MetadataBuf)->DataBlockSize = 0;
 }
-BP5Serializer::BP5WriterRec BP5Serializer::LookupWriterRec(void *Key) const
+BP5Serializer::BP5WriterRec BP5Serializer::LookupWriterRec(void *Variable) const
 {
-    auto it = Info.RecMap.find(Key);
-    if (it != Info.RecMap.end())
+    core::VariableBase *VB = static_cast<core::VariableBase *>(Variable);
+    auto it2 = Info.RecNameMap.find(VB->m_Name);
+    if (it2 != Info.RecNameMap.end())
     {
-        return const_cast<BP5WriterRec>(&(it->second));
+        return const_cast<BP5WriterRec>(&(it2->second));
     }
     return NULL;
 }
@@ -467,6 +470,8 @@ void BP5Serializer::AddDoubleArrayField(FMFieldList *FieldP, int *CountP, const 
 void BP5Serializer::ValidateWriterRec(BP5Serializer::BP5WriterRec Rec, void *Variable)
 {
     core::VariableBase *VB = static_cast<core::VariableBase *>(Variable);
+
+    Rec->Key = Variable; // reset this, because Variable might have been destroyed and recreated
     if ((VB->m_Operations.size() == 0) && Rec->OperatorType)
     {
         // removed operator case
@@ -505,7 +510,7 @@ BP5Serializer::BP5WriterRec BP5Serializer::CreateWriterRec(void *Variable, const
 #ifdef ADIOS2_HAVE_DERIVED_VARIABLE
     core::VariableDerived *VD = dynamic_cast<core::VariableDerived *>(VB);
 #endif
-    auto obj = Info.RecMap.insert(std::make_pair(Variable, _BP5WriterRec()));
+    auto obj = Info.RecNameMap.insert(std::make_pair(VB->m_Name, _BP5WriterRec()));
     BP5WriterRec Rec = &obj.first->second;
     if (Type == DataType::String)
         ElemSize = sizeof(char *);
@@ -550,6 +555,8 @@ BP5Serializer::BP5WriterRec BP5Serializer::CreateWriterRec(void *Variable, const
         struct_list[0].struct_size = (int)SD->StructSize();
 
         FMFormat Format = register_data_format(Info.LocalFMContext, &struct_list[0]);
+        free_FMfield_list(List);
+        free((void *)struct_list[0].format_name);
 
         int IDLength;
         char *ServerID = get_server_ID_FMformat(Format, &IDLength);
@@ -636,6 +643,8 @@ BP5Serializer::BP5WriterRec BP5Serializer::CreateWriterRec(void *Variable, const
         // Changing the formats renders these invalid
         Info.MetaFormat = NULL;
     }
+    if (TextStructID)
+        free((void *)TextStructID);
     Info.RecCount++;
     return Rec;
 }
@@ -819,7 +828,8 @@ void BP5Serializer::Marshal(void *Variable, const char *Name, const DataType Typ
 #ifdef ADIOS2_HAVE_DERIVED_VARIABLE
         DerivedWithoutStats = VD && (VD->GetDerivedType() == DerivedVarType::ExpressionString);
 #endif
-        bool DoMinMax = ((m_StatsLevel > 0) && !DerivedWithoutStats);
+        bool DoMinMax =
+            ((m_StatsLevel > 0) && !DerivedWithoutStats && TypeHasMinMax((DataType)Rec->Type));
         if (DoMinMax && !Span)
         {
             GetMinMax(Data, ElemCount, (DataType)Rec->Type, MinMax, MemSpace);
@@ -1249,7 +1259,7 @@ BufferV *BP5Serializer::ReinitStepData(BufferV *DataBuffer, bool forceCopyDeferr
 
 void BP5Serializer::CollectFinalShapeValues()
 {
-    for (auto it : Info.RecMap)
+    for (auto it : Info.RecNameMap)
     {
         BP5WriterRec Rec = &it.second;
         if (Rec->Shape == ShapeID::GlobalArray)
@@ -1373,15 +1383,6 @@ BP5Serializer::TimestepInfo BP5Serializer::CloseTimestep(int timestep, bool forc
 
     BufferFFS *AttrData = NULL;
 
-    // old way of doing attributes
-    if (NewAttribute && Info.AttributeFields)
-    {
-        AttributeEncodeBuffer = create_FFSBuffer();
-        void *AttributeBlock = FFSencode(AttributeEncodeBuffer, Info.AttributeFormat,
-                                         Info.AttributeData, &AttributeSize);
-        AttrData = new BufferFFS(AttributeEncodeBuffer, AttributeBlock, AttributeSize);
-    }
-
     if (PendingAttrs)
     {
         if (!GenericAttributeFormat)
@@ -1406,6 +1407,17 @@ BP5Serializer::TimestepInfo BP5Serializer::CloseTimestep(int timestep, bool forc
         FMfree_var_rec_elements(GenericAttributeFormat, PendingAttrs);
         delete (PendingAttrs);
         PendingAttrs = nullptr;
+    }
+    else
+    {
+        // old way of doing attributes
+        if (NewAttribute && Info.AttributeFields)
+        {
+            AttributeEncodeBuffer = create_FFSBuffer();
+            void *AttributeBlock = FFSencode(AttributeEncodeBuffer, Info.AttributeFormat,
+                                             Info.AttributeData, &AttributeSize);
+            AttrData = new BufferFFS(AttributeEncodeBuffer, AttributeBlock, AttributeSize);
+        }
     }
 
     // FMdump_encoded_data(Info.MetaFormat, MetaDataBlock, 1024000);
@@ -1555,13 +1567,13 @@ std::vector<core::iovec> BP5Serializer::BreakoutContiguousMetadata(
     for (size_t Rank = 0; Rank < Counts.size(); Rank++)
     {
         uint64_t NMMBCount, MBCount, ABCount, DSCount, WDPCount;
-        helper::CopyFromBuffer(Aggregate, Position, &NMMBCount);
+        helper::CopyFromBuffer(Aggregate.data(), Position, &NMMBCount);
         for (uint64_t i = 0; i < NMMBCount; i++)
         {
             uint64_t IDLen;
             uint64_t InfoLen;
-            helper::CopyFromBuffer(Aggregate, Position, &IDLen);
-            helper::CopyFromBuffer(Aggregate, Position, &InfoLen);
+            helper::CopyFromBuffer(Aggregate.data(), Position, &IDLen);
+            helper::CopyFromBuffer(Aggregate.data(), Position, &InfoLen);
             uint64_t IDPosition = Position;
             uint64_t InfoPosition = Position + IDLen;
             Position = InfoPosition + InfoLen;
@@ -1580,33 +1592,33 @@ std::vector<core::iovec> BP5Serializer::BreakoutContiguousMetadata(
                 UniqueMetaMetaBlocks.push_back(New);
             }
         }
-        helper::CopyFromBuffer(Aggregate, Position, &MBCount);
+        helper::CopyFromBuffer(Aggregate.data(), Position, &MBCount);
         for (uint64_t i = 0; i < MBCount; ++i)
         {
             uint64_t MEBSize;
-            helper::CopyFromBuffer(Aggregate, Position, &MEBSize);
+            helper::CopyFromBuffer(Aggregate.data(), Position, &MEBSize);
             MetadataBlocks.push_back({Aggregate.data() + Position, MEBSize});
             Position += MEBSize;
         }
-        helper::CopyFromBuffer(Aggregate, Position, &ABCount);
+        helper::CopyFromBuffer(Aggregate.data(), Position, &ABCount);
         for (uint64_t i = 0; i < ABCount; ++i)
         {
             uint64_t AEBSize;
-            helper::CopyFromBuffer(Aggregate, Position, &AEBSize);
+            helper::CopyFromBuffer(Aggregate.data(), Position, &AEBSize);
             AttributeBlocks.push_back({Aggregate.data() + Position, AEBSize});
             Position += AEBSize;
         }
         uint64_t element;
-        helper::CopyFromBuffer(Aggregate, Position, &DSCount);
+        helper::CopyFromBuffer(Aggregate.data(), Position, &DSCount);
         for (uint64_t i = 0; i < DSCount; ++i)
         {
-            helper::CopyFromBuffer(Aggregate, Position, &element);
+            helper::CopyFromBuffer(Aggregate.data(), Position, &element);
             DataSizes.push_back(element);
         }
-        helper::CopyFromBuffer(Aggregate, Position, &WDPCount);
+        helper::CopyFromBuffer(Aggregate.data(), Position, &WDPCount);
         for (uint64_t i = 0; i < WDPCount; ++i)
         {
-            helper::CopyFromBuffer(Aggregate, Position, &element);
+            helper::CopyFromBuffer(Aggregate.data(), Position, &element);
             WriterDataPositions.push_back(element);
         }
     }

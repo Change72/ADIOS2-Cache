@@ -83,7 +83,7 @@ endif()
 if(NOT @BUILD_SHARED_LIBS@)
   set(ADIOS2_HAVE_Blosc2 @ADIOS2_HAVE_Blosc2@)
   if(ADIOS2_HAVE_Blosc2)
-    find_dependency(Blosc2)
+    find_dependency(Blosc2 2.10.1)
   endif()
 
   set(ADIOS2_HAVE_BZip2 @ADIOS2_HAVE_BZip2@)
@@ -145,6 +145,17 @@ if(NOT @BUILD_SHARED_LIBS@)
   set(ADIOS2_HAVE_AWSSDK @ADIOS2_HAVE_AWSSDK@)
   if(ADIOS2_HAVE_AWSSDK)
     find_dependency(AWSSDK)
+  endif()
+
+  set(ADIOS2_HAVE_XRootD @ADIOS2_HAVE_XRootD@)
+  if(ADIOS2_HAVE_XRootD)
+      find_dependency(XRootD)
+  endif()
+
+  set(ADIOS2_HAVE_Campaign @ADIOS2_HAVE_Campaign@)
+  if(ADIOS2_HAVE_Campaign)
+    find_dependency(ZLIB)
+    find_dependency(SQLite3)
   endif()
 
 
