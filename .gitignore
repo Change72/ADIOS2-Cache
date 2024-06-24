@@ -41,8 +41,13 @@ docs/pyvenv.cfg
 .vs/
 CMakeSettings.json
 
-# gc
+# Python wheels stuff
+
+*.egg-info/
+
+
+build-*/
+cmake-build-*/
 .idea/
-build-python/
-build-cache/
-cmake-build-debug/
+.vscode/
+*.rdb
