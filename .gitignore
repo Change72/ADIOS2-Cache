@@ -44,3 +44,10 @@ CMakeSettings.json
 # Python wheels stuff
 
 *.egg-info/
+
+
+build-*/
+cmake-build-*/
+.idea/
+.vscode/
+*.rdb

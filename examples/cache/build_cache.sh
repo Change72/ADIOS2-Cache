@@ -52,17 +52,19 @@ build_cache() {
 
     make -j32
     make install
-    cd -
+    cd ${BUILD_DIR}/../
 }
 
 start_services() {
     echo "Starting redis server and setting environment variables..."
-    nohup ${SW_DIR}/redis/src/redis-server > ${SW_DIR}redis_server.log 2>&1 &
-    nohup ${SW_DIR}/adios2/bin/remote_server > ${SW_DIR}remote_server.log 2>&1 &
     export DoRemote=1
     export useKVCache=1
     export PYTHONPATH=${SW_DIR}/adios2/local/lib/python3.10/dist-packages/
     export LD_LIBRARY_PATH=${SW_DIR}/adios2/lib:${SW_DIR}/hiredis/lib:$LD_LIBRARY_PATH
+    nohup ${SW_DIR}/redis/src/redis-server > ${SW_DIR}redis_server.log 2>&1 &
+    nohup ${SW_DIR}/adios2/bin/adios2_remote_server > ${SW_DIR}remote_server.log 2>&1 &
+    sleep 5
+    nohup ${SW_DIR}/redis/src/redis-cli monitor > ${SW_DIR}redis_monitor.log 2>&1 &
     echo "Services started and environment variables set."
 }
 
@@ -70,6 +72,7 @@ start_services() {
 stop_services() {
     echo "Stopping services..."
     pkill -f redis-server
+    pkill -f redis-cli
     pkill -f remote_server
     unset DoRemote
     unset useKVCache
