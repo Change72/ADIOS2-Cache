@@ -348,7 +348,14 @@ void BP5Reader::PerformGets()
 #ifdef ADIOS2_HAVE_KVCACHE
         if (getenv("useKVCache"))
         {
-            PerformRemoteGetsWithKVCache();
+            if (getenv("useTraditionalCache"))
+            {
+                PerformRemoteGetsWithTraditionalKVCache();
+            }
+            else
+            {
+                PerformRemoteGetsWithKVCache();
+            }
         }
         else
         {
@@ -365,6 +372,68 @@ void BP5Reader::PerformGets()
 
     // clear pending requests inside deserializer
     m_BP5Deserializer->ClearGetState();
+}
+
+void BP5Reader::PerformRemoteGetsWithTraditionalKVCache()
+{
+    auto GetRequests = m_BP5Deserializer->PendingGetRequests;
+    std::vector<Remote::GetHandle> handles;
+
+    struct RequestInfo
+    {
+        size_t ReqSeq;
+        size_t TypeSize;
+        size_t ReqSize;
+        std::string CacheKey;
+        bool DirectCopy;
+        kvcache::QueryBox ReqBox;
+        void *Data;
+
+        // Constructor to initialize Start and Count with DimCount
+        RequestInfo(size_t dimCount) : ReqBox(dimCount) {}
+    };
+    std::vector<RequestInfo> remoteRequestsInfo;
+
+    for (size_t req_seq = 0; req_seq < GetRequests.size(); req_seq++)
+    {
+        auto &Req = GetRequests[req_seq];
+        const DataType varType = m_IO.InquireVariableType(Req.VarName);
+
+        std::string keyPrefix = m_Fingerprint + "|" + Req.VarName + std::to_string(Req.RelStep);
+
+        RequestInfo ReqInfo(Req.Count.size());
+        ReqInfo.ReqSeq = req_seq;
+        ReqInfo.TypeSize = helper::GetDataTypeSize(varType);
+
+        kvcache::QueryBox targetBox(Req.Start, Req.Count);
+        std::string targetKey = keyPrefix + targetBox.toString();
+
+        // Exact Match: check if targetKey exists
+        if (m_KVCache.Exists(targetKey))
+        {
+            m_KVCache.Get(targetKey.c_str(), ReqInfo.ReqSize * ReqInfo.TypeSize, Req.Data);
+            std::cout << "Found " << targetKey << " in cache" << std::endl;
+        }
+        else
+        {
+            ReqInfo.ReqSize = targetBox.size();
+            ReqInfo.CacheKey = keyPrefix + targetBox.toString();
+            ReqInfo.ReqBox = targetBox;
+            ReqInfo.Data = malloc(ReqInfo.ReqSize * ReqInfo.TypeSize);
+            auto handle = m_Remote->Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
+            handles.push_back(handle);
+            remoteRequestsInfo.push_back(ReqInfo);
+        }
+    }
+
+    for (size_t handle_seq = 0; handle_seq < handles.size(); handle_seq++)
+    {
+        auto handle = handles[handle_seq];
+        m_Remote->WaitForGet(handle);
+        auto &ReqInfo = remoteRequestsInfo[handle_seq];
+        auto &Req = GetRequests[ReqInfo.ReqSeq];
+        m_KVCache.Set(ReqInfo.CacheKey.c_str(), ReqInfo.ReqSize * ReqInfo.TypeSize, Req.Data);
+    }
 }
 
 void BP5Reader::PerformRemoteGetsWithKVCache()

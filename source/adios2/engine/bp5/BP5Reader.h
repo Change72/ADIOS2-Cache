@@ -264,6 +264,8 @@ private:
 
     void PerformRemoteGets();
 
+    void PerformRemoteGetsWithTraditionalKVCache();
+
     void PerformRemoteGetsWithKVCache();
 
     void DestructorClose(bool Verbose) noexcept;
