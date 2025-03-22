@@ -272,6 +272,10 @@ public:
                 {
                     maxInteract = intersection;
                     maxSourceBox = box;
+                    if (maxInteract.size() == this->size())
+                    {
+                        break;
+                    }
                 }
             }
         }
