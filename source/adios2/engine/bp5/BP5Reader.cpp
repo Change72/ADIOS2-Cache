@@ -358,7 +358,7 @@ void BP5Reader::PerformGets()
             }
             else if (getenv("useFunctionalKVCacheWithMetaManager"))
             {
-#ifdef ADIOS2_HAVE_SpatialIndex
+#ifdef ADIOS2_HAVE_SPATIALINDEX
                 PerformRemoteGetsWithKVCacheAndMetaManager();
 #else
                 PerformRemoteGetsWithKVCache();
@@ -388,6 +388,7 @@ void BP5Reader::PerformGets()
 
 void BP5Reader::PerformRemoteGetsWithTraditionalKVCache()
 {
+    std::cout << "PerformRemoteGetsWithTraditionalKVCache" << std::endl;
     auto GetRequests = m_BP5Deserializer->PendingGetRequests;
     std::vector<Remote::GetHandle> handles;
 
@@ -449,6 +450,7 @@ void BP5Reader::PerformRemoteGetsWithTraditionalKVCache()
 
 void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
 {
+    std::cout << "PerformRemoteGetsWithKVCacheAndMetaManager" << std::endl;
     auto GetRequests = m_BP5Deserializer->PendingGetRequests;
     std::vector<Remote::GetHandle> handles;
 
@@ -473,6 +475,8 @@ void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
         const size_t capacity = 20;
         m_KVCacheMetadata.m_dim = 3;
         m_KVCacheMetadata.CreateNewTree(capacity);
+    } else {
+        m_KVCacheMetadata.PrintTree();
     }
 
     for (size_t req_seq = 0; req_seq < GetRequests.size(); req_seq++)
@@ -597,6 +601,7 @@ void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
 
 void BP5Reader::PerformRemoteGetsWithKVCache()
 {
+    std::cout << "PerformRemoteGetsWithKVCache" << std::endl;
     auto GetRequests = m_BP5Deserializer->PendingGetRequests;
     std::vector<Remote::GetHandle> handles;
 

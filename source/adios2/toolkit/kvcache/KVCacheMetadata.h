@@ -7,7 +7,7 @@
 
 #include "QueryBox.h"
 
-#ifdef ADIOS2_HAVE_SpatialIndex
+#ifdef ADIOS2_HAVE_SPATIALINDEX
 #include <spatialindex/SpatialIndex.h>
 #endif
 
@@ -17,7 +17,7 @@ namespace adios2
 namespace kvcache
 {
 
-#ifdef ADIOS2_HAVE_SpatialIndex
+#ifdef ADIOS2_HAVE_SPATIALINDEX
 class MyVisitor : public IVisitor
 {
 public:
@@ -47,7 +47,7 @@ public:
 class KVCacheMetadata
 {
 
-#ifdef ADIOS2_HAVE_SpatialIndex
+#ifdef ADIOS2_HAVE_SPATIALINDEX
 public:
     SpatialIndex::ISpatialIndex* m_tree = nullptr;
     size_t m_dim;
@@ -141,6 +141,10 @@ public:
         }
     }
 
+    void PrintTree() {
+        std::cout << *m_tree << std::endl;
+    }
+
 #else
 public:
     void* m_tree = nullptr;
@@ -152,6 +156,7 @@ public:
     void Insert(const QueryBox &queryBox) {}
     void Query(const QueryBox &queryBox, const size_t &max_depth, size_t current_depth,
                std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes) {}
+    void PrintTree() {}
 #endif
 
 };

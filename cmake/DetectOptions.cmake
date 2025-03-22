@@ -641,7 +641,7 @@ elseif(ADIOS2_USE_SpatialIndex)
   find_package(SpatialIndex REQUIRED)
 endif()
 if(SpatialIndex_FOUND)
-  set(ADIOS2_HAVE_SpatialIndex TRUE)
+  set(ADIOS2_HAVE_SPATIALINDEX TRUE)
   message(STATUS "SpatialIndex found. Turn on SpatialIndex")
 endif()
 

@@ -255,7 +255,7 @@ if (ADIOS2_HAVE_KVCACHE)
   target_link_libraries(adios2_core PRIVATE hiredis::hiredis)
 endif ()
 
-if (ADIOS2_HAVE_SpatialIndex)
+if (ADIOS2_HAVE_SPATIALINDEX)
   target_sources(adios2_core PRIVATE toolkit/kvcache/KVCacheMetadata.cpp)
   target_link_libraries(adios2_core PRIVATE spatialindex)
 endif ()

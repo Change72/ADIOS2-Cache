@@ -47,6 +47,7 @@ CMakeSettings.json
 
 # CMake generated files
 build/
+cmake-build-debug/
 .idea/
 .vscode/
 

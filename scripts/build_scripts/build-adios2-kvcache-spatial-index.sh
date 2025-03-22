@@ -5,9 +5,7 @@
 #            We need to build it from source code. You can also use the following scripts to install hiredis (v1.2.0).
 
 # sample usage: in project home directory:
-# source scripts/build_scripts/build-adios2-kvcache.sh --build 
-# source scripts/build_scripts/build-adios2-kvcache.sh --start
-# source scripts/build_scripts/build-adios2-kvcache.sh --stop
+# source scripts/build_scripts/build-adios2-kvcache-spatial-index.sh --build
 
 if [ -z "${BUILD_DIR}" ]
 then
