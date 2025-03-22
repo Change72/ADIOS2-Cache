@@ -407,6 +407,7 @@ void BP5Reader::PerformRemoteGetsWithTraditionalKVCache()
 
         kvcache::QueryBox targetBox(Req.Start, Req.Count);
         std::string targetKey = keyPrefix + targetBox.toString();
+        ReqInfo.ReqSize = targetBox.size();
 
         // Exact Match: check if targetKey exists
         if (m_KVCache.Exists(targetKey))
@@ -416,10 +417,8 @@ void BP5Reader::PerformRemoteGetsWithTraditionalKVCache()
         }
         else
         {
-            ReqInfo.ReqSize = targetBox.size();
-            ReqInfo.CacheKey = keyPrefix + targetBox.toString();
+            ReqInfo.CacheKey = targetKey;
             ReqInfo.ReqBox = targetBox;
-            ReqInfo.Data = malloc(ReqInfo.ReqSize * ReqInfo.TypeSize);
             auto handle = m_Remote->Get(Req.VarName, Req.RelStep, Req.BlockID, Req.Count, Req.Start, Req.Data);
             handles.push_back(handle);
             remoteRequestsInfo.push_back(ReqInfo);
