@@ -9,6 +9,7 @@
 
 #ifdef ADIOS2_HAVE_SPATIALINDEX
 #include <spatialindex/SpatialIndex.h>
+using namespace SpatialIndex;
 #endif
 
 namespace adios2
@@ -23,7 +24,7 @@ class MyVisitor : public IVisitor
 public:
     MyVisitor() = default;
 
-    vector<const IShape*> results;  // Store overlapping regions
+    std::vector<const IShape*> results;  // Store overlapping regions
 
     void visitNode(const INode& n) override{
         // Do nothing
@@ -46,7 +47,8 @@ public:
 
 class KVCacheMetadata
 {
-
+private:
+    int64_t indexIdentifier = 0;
 #ifdef ADIOS2_HAVE_SPATIALINDEX
 public:
     SpatialIndex::ISpatialIndex* m_tree = nullptr;
@@ -62,7 +64,8 @@ public:
     }
 
     void CreateNewTree(size_t capacity) {
-        m_tree = SpatialIndex::RTree::createNewRTree(SpatialIndex::StorageManager::createNewMemoryStorageManager(), 0.7, capacity, capacity, m_dim, SpatialIndex::RTree::RV_RSTAR);
+        IStorageManager* memoryFile = StorageManager::createNewMemoryStorageManager();
+        m_tree = SpatialIndex::RTree::createNewRTree(*memoryFile, 0.7, capacity, capacity, m_dim, SpatialIndex::RTree::RV_RSTAR, indexIdentifier);
     }
 
     void Insert(const QueryBox &queryBox) {
@@ -75,7 +78,7 @@ public:
         }
 
         SpatialIndex::Region r(pLow, pHigh, m_dim);
-        m_tree->insertData(0, nullptr, r);
+        m_tree->insertData(0, nullptr, r, indexIdentifier++);
     }
 
     void Query(const QueryBox &queryBox, const size_t &max_depth, size_t current_depth,
@@ -118,7 +121,7 @@ public:
                 }
             }
         }
-
+        
         if (maxInteractBox.size() == 0) {
             regularBoxes.push_back(queryBox);
             return;
