@@ -6,6 +6,7 @@
 #define ADIOS2_KVCACHEMETADATA_H
 
 #include "QueryBox.h"
+#include "KVCacheCommon.h"
 
 #ifdef ADIOS2_HAVE_SPATIALINDEX
 #include <spatialindex/SpatialIndex.h>
@@ -82,7 +83,8 @@ public:
     }
 
     void Query(const QueryBox &queryBox, const size_t &max_depth, size_t current_depth,
-               std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes) {
+               std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes,
+                 KVCacheCommon kvcache, const std::string &keyPrefix) {
         if (current_depth > max_depth)
         {
             return;
@@ -114,6 +116,11 @@ public:
             overlapBox.IsInteracted(queryBox, intersectionBox);
 
             if (maxInteractBox.size() < intersectionBox.size()) {
+                // check if the box is still cached (not evicted)
+                std::string key = keyPrefix + overlapBox.ToString();
+                if (!kvcache.Exists(key)) {
+                    continue;
+                }
                 maxOverlapBox = overlapBox;
                 maxInteractBox = intersectionBox;
                 if (maxInteractBox.size() == queryBox.size()) {
@@ -158,7 +165,8 @@ public:
     void CreateNewTree(size_t capacity) {}
     void Insert(const QueryBox &queryBox) {}
     void Query(const QueryBox &queryBox, const size_t &max_depth, size_t current_depth,
-               std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes) {}
+               std::vector<QueryBox> &regularBoxes, std::vector<QueryBox> &cachedBoxes,
+               KVCacheCommon kvcache, const std::string &keyPrefix) {}
     void PrintTree() {}
 #endif
 

@@ -514,7 +514,7 @@ void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
             std::vector<kvcache::QueryBox> regularBoxes;
             std::vector<kvcache::QueryBox> cachedBoxes;
 
-            m_KVCacheMetadata.Query(targetBox, max_depth, 0, regularBoxes, cachedBoxes);
+            m_KVCacheMetadata.Query(targetBox, max_depth, 0, regularBoxes, cachedBoxes, m_KVCache, keyPrefix);
 
             std::cout << "Going to retrieve " << regularBoxes.size()
                       << " boxes from remote server, and " << cachedBoxes.size()
