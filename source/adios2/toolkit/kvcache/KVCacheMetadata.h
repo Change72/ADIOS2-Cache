@@ -117,8 +117,9 @@ public:
 
             if (maxInteractBox.size() < intersectionBox.size()) {
                 // check if the box is still cached (not evicted)
-                std::string key = keyPrefix + overlapBox.ToString();
+                std::string key = keyPrefix + overlapBox.toString();
                 if (!kvcache.Exists(key)) {
+                    std::cout << "Key has been evicted: " << key << std::endl;
                     continue;
                 }
                 maxOverlapBox = overlapBox;
@@ -146,7 +147,7 @@ public:
             std::vector<QueryBox> nextBoxes;
             maxInteractBox.NdCut(queryBox, nextBoxes);
             for (QueryBox &nextBox : nextBoxes) {
-                this->Query(nextBox, max_depth, current_depth, regularBoxes, cachedBoxes);
+                this->Query(nextBox, max_depth, current_depth, regularBoxes, cachedBoxes, kvcache, keyPrefix);
             }
         }
     }

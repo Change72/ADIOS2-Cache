@@ -475,8 +475,6 @@ void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
         const size_t capacity = 20;
         m_KVCacheMetadata.m_dim = 3;
         m_KVCacheMetadata.CreateNewTree(capacity);
-    } else {
-        m_KVCacheMetadata.PrintTree();
     }
 
     for (size_t req_seq = 0; req_seq < GetRequests.size(); req_seq++)
