@@ -117,7 +117,7 @@ public:
 
             if (maxInteractBox.size() < intersectionBox.size()) {
                 // check if maxDepth (scheduler) is set and intersectionBox size is larger than 1 MB / 8 B (double)
-                if (max_depth != 999 && intersectionBox.size() < 1024 * 1024 / sizeof(double)) {
+                if (max_depth != 999 && intersectionBox.size() < 1024 * 1 / sizeof(double)) {
                     continue;
                 }
                 // check if the box is still cached (not evicted)
