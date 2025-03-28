@@ -427,7 +427,7 @@ void BP5Reader::PerformRemoteGetsWithTraditionalKVCache()
         {
             m_KVCache.Get(targetKey.c_str(), ReqInfo.ReqSize * ReqInfo.TypeSize, Req.Data);
             std::cout << "Found " << targetKey << " in cache" << std::endl;
-            std::cout << "Going to reuse " << targetBox.toString() << " from cache" << std::endl;
+            std::cout << "[Exact] Going to reuse " << targetBox.toString() << " from cache" << std::endl;
         }
         else
         {
@@ -501,7 +501,7 @@ void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
             cachedRequestsInfo.push_back(ReqInfo);
 
             std::cout << "Found " << targetKey << " in cache" << std::endl;
-            std::cout << "Going to reuse " << targetBox.toString() << " from cache" << std::endl;
+            std::cout << "[Exact] Going to reuse " << targetBox.toString() << " from cache" << std::endl;
         }
         else
         {
@@ -545,7 +545,6 @@ void BP5Reader::PerformRemoteGetsWithKVCacheAndMetaManager()
                 ReqInfo.ReqBox = box;
                 ReqInfo.DirectCopy = false;
                 cachedRequestsInfo.push_back(ReqInfo);
-                std::cout << "Going to reuse " << box.toString() << " from cache" << std::endl;
             }
         }
     }
@@ -673,7 +672,7 @@ void BP5Reader::PerformRemoteGetsWithKVCache()
             cachedRequestsInfo.push_back(ReqInfo);
 
             std::cout << "Found " << targetKey << " in cache" << std::endl;
-            std::cout << "Going to reuse " << targetBox.toString() << " from cache" << std::endl;
+            std::cout << "[Exact] Going to reuse " << targetBox.toString() << " from cache" << std::endl;
         }
         else
         {
@@ -727,7 +726,6 @@ void BP5Reader::PerformRemoteGetsWithKVCache()
                 ReqInfo.ReqBox = box;
                 ReqInfo.DirectCopy = false;
                 cachedRequestsInfo.push_back(ReqInfo);
-                std::cout << "Going to reuse " << box.toString() << " from cache" << std::endl;
             }
         }
     }

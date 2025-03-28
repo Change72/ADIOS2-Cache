@@ -140,6 +140,8 @@ public:
         }
 
         cachedBoxes.push_back(maxOverlapBox);
+        std::cout << "[Partial] Going to retrieve " << maxOverlapBox.toString() << " from cache" << std::endl;
+        std::cout << "[Partial] Going to reuse " << maxInteractBox.toString() << " from cache" << std::endl;
 
         if (maxInteractBox.size() == queryBox.size()) {
             return;
